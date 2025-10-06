@@ -7,7 +7,6 @@ export interface ContentStats {
   subclasses: number
   items: number
   backgrounds: number
-  adventures: number
   feats: number
 }
 
@@ -17,7 +16,6 @@ export interface AllContent {
   classes: any[]
   items: any[]
   backgrounds: any[]
-  adventures: any[]
   feats: any[]
 }
 
@@ -46,7 +44,6 @@ export async function loadAllContent(): Promise<AllContent> {
       classes: [],
       items: [],
       backgrounds: [],
-      adventures: [],
       feats: []
     }
   }
@@ -73,7 +70,6 @@ export async function getContentStats(): Promise<ContentStats> {
       subclasses: 0,
       items: 0,
       backgrounds: 0,
-      adventures: 0,
       feats: 0
     }
   }

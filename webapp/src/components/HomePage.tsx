@@ -7,6 +7,8 @@ import { SpellsPage } from '@/components/pages/SpellsPage'
 import { RacesPage } from '@/components/pages/RacesPage'
 import { ClassesPage } from '@/components/pages/ClassesPage'
 import { ItemsPage } from '@/components/pages/ItemsPage'
+import { BackgroundsPage } from '@/components/pages/BackgroundsPage'
+import { FeatsPage } from '@/components/pages/FeatsPage'
 import { ContentView } from '@/components/ContentView'
 
 interface HomePageProps {
@@ -58,14 +60,6 @@ const categoryCards = [
     textColor: 'text-indigo-600 dark:text-indigo-400'
   },
   {
-    id: 'adventures',
-    title: 'Adventures',
-    description: 'Explore published adventure modules',
-    icon: Map,
-    color: 'from-purple-500 to-indigo-600',
-    textColor: 'text-purple-600 dark:text-purple-400'
-  },
-  {
     id: 'feats',
     title: 'Feats',
     description: 'Discover character feats and abilities',
@@ -113,6 +107,14 @@ export function HomePage({ selectedCategory, onCategorySelect, searchQuery, onSe
   
   if (selectedCategory === 'items') {
     return <ItemsPage searchQuery={searchQuery} onSearch={onSearch} />
+  }
+  
+  if (selectedCategory === 'backgrounds') {
+    return <BackgroundsPage searchQuery={searchQuery} onSearch={onSearch} />
+  }
+  
+  if (selectedCategory === 'feats') {
+    return <FeatsPage searchQuery={searchQuery} onSearch={onSearch} />
   }
   
   // For other categories, use the generic ContentView

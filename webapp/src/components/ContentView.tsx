@@ -53,7 +53,6 @@ export function ContentView({ category, searchQuery, onSearch }: ContentViewProp
         classes: data.classes,
         items: data.items,
         backgrounds: data.backgrounds,
-        adventures: data.adventures,
         feats: data.feats
       }
       setAllContent(contentRecord)

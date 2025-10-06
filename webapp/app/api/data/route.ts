@@ -57,11 +57,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Load other content types
-    const [racesData, itemsData, backgroundsData, adventuresData, featsData] = await Promise.all([
+    const [racesData, itemsData, backgroundsData, featsData] = await Promise.all([
       loadDataFile('races.json'),
       loadDataFile('items.json'),
       loadDataFile('backgrounds.json'),
-      loadDataFile('adventures.json'),
       loadDataFile('feats.json')
     ])
 
@@ -107,7 +106,6 @@ export async function GET(request: NextRequest) {
       classes: allClasses,
       items: itemsData?.item || [],
       backgrounds: backgroundsData?.background || [],
-      adventures: adventuresData?.adventure || [],
       feats: featsData?.feat || []
     }
 
@@ -119,7 +117,6 @@ export async function GET(request: NextRequest) {
       subclasses: content.classes.filter((c: any) => c.isSubclass).length,
       items: content.items.length,
       backgrounds: content.backgrounds.length,
-      adventures: content.adventures.length,
       feats: content.feats.length
     }
 
