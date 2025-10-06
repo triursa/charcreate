@@ -1,11 +1,15 @@
-'use client'
+"use client"
 
-import { useEffect, useState } from 'react'
-import { Search, Filter, BookOpen, Zap, Clock, Target } from 'lucide-react'
-import { getContentByCategory } from '@/lib/clientDataLoader'
-import { searchAllContent, filterContent, getFilterOptions } from '@/lib/search'
-import { SpellCard } from '@/components/cards/SpellCard'
-import { FilterPanel } from '@/components/FilterPanel'
+import { useEffect, useMemo, useState } from "react"
+import { Filter, Loader2, Sparkles, Search } from "lucide-react"
+
+import { DataTable, type ColumnConfig } from "@/components/DataTable"
+import { DetailDrawer } from "@/components/DetailDrawer"
+import { FilterPanel } from "@/components/FilterPanel"
+import { SpellDetail } from "@/components/details/SpellDetail"
+import { getContentByCategory } from "@/lib/clientDataLoader"
+import { searchAllContent, filterContent, getFilterOptions } from "@/lib/search"
+import { formatRange, formatSpellLevel, getSchoolName } from "@/lib/textParser"
 
 interface SpellsPageProps {
   searchQuery: string
@@ -24,7 +28,7 @@ export function SpellsPage({ searchQuery, onSearch }: SpellsPageProps) {
     school: []
   })
   const [filterOptions, setFilterOptions] = useState<any>({})
-  const [sortBy, setSortBy] = useState('name')
+  const [selectedSpell, setSelectedSpell] = useState<any | null>(null)
 
   useEffect(() => {
     loadSpells()
@@ -32,18 +36,18 @@ export function SpellsPage({ searchQuery, onSearch }: SpellsPageProps) {
 
   useEffect(() => {
     applyFiltersAndSearch()
-  }, [searchQuery, filters, sortBy, spells])
+  }, [searchQuery, filters, spells])
 
   const loadSpells = async () => {
     try {
       setLoading(true)
-      const data = await getContentByCategory('spells')
+      const data = await getContentByCategory("spells")
       setSpells(data)
-      
-      const options = getFilterOptions(data, 'spells')
+
+      const options = getFilterOptions(data, "spells")
       setFilterOptions(options)
     } catch (error) {
-      console.error('Error loading spells:', error)
+      console.error("Error loading spells:", error)
     } finally {
       setLoading(false)
     }
@@ -52,30 +56,14 @@ export function SpellsPage({ searchQuery, onSearch }: SpellsPageProps) {
   const applyFiltersAndSearch = () => {
     let result = [...spells]
 
-    // Apply search
     if (searchQuery.trim()) {
       const searchResults = searchAllContent({ spells }, searchQuery, 100)
-      result = searchResults.map(r => r.item)
+      result = searchResults.map((r) => r.item)
     }
 
-    // Apply filters
-    result = filterContent(result, 'spells', filters)
+    result = filterContent(result, "spells", filters)
 
-    // Apply sorting
-    result.sort((a, b) => {
-      switch (sortBy) {
-        case 'name':
-          return (a.name || '').localeCompare(b.name || '')
-        case 'level':
-          return (a.level || 0) - (b.level || 0)
-        case 'school':
-          return (a.school || '').localeCompare(b.school || '')
-        case 'source':
-          return (a.source || '').localeCompare(b.source || '')
-        default:
-          return 0
-      }
-    })
+    result.sort((a, b) => (a.name || "").localeCompare(b.name || ""))
 
     setFilteredSpells(result)
   }
@@ -84,156 +72,218 @@ export function SpellsPage({ searchQuery, onSearch }: SpellsPageProps) {
     setFilters(newFilters)
   }
 
-  const getSpellStats = () => {
-    const stats = {
-      total: spells.length,
-      cantrips: spells.filter(s => s.level === 0).length,
-      highLevel: spells.filter(s => s.level >= 6).length,
-      schools: new Set(spells.map(s => s.school)).size
-    }
-    return stats
-  }
+  const spellStats = useMemo(() => {
+    const total = spells.length
+    const cantrips = spells.filter((spell) => spell.level === 0).length
+    const highLevel = spells.filter((spell) => spell.level >= 6).length
+    const schools = new Set(spells.map((spell) => getSchoolName(spell.school || ""))).size
+
+    return [
+      { label: "Total Spells", value: total.toLocaleString() },
+      { label: "Cantrips", value: cantrips.toLocaleString() },
+      { label: "High Level", value: highLevel.toLocaleString() },
+      { label: "Schools", value: schools.toLocaleString() }
+    ]
+  }, [spells])
+
+  const columns: ColumnConfig<any>[] = useMemo(
+    () => [
+      {
+        id: "name",
+        label: "Spell",
+        accessor: (spell) => (
+          <div className="flex flex-col">
+            <span className="font-semibold text-gray-900 dark:text-gray-100">{spell.name}</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {formatSpellLevel(spell.level ?? 0)} • {getSchoolName(spell.school ?? "")}
+            </span>
+          </div>
+        ),
+        sortable: true,
+        sortValue: (spell) => spell.name ?? "",
+        minWidth: "220px"
+      },
+      {
+        id: "level",
+        label: "Level",
+        accessor: (spell) => formatSpellLevel(spell.level ?? 0),
+        sortable: true,
+        sortValue: (spell) => spell.level ?? 0,
+        align: "center",
+        minWidth: "120px"
+      },
+      {
+        id: "school",
+        label: "School",
+        accessor: (spell) => getSchoolName(spell.school ?? ""),
+        sortable: true,
+        sortValue: (spell) => getSchoolName(spell.school ?? "")
+      },
+      {
+        id: "casting",
+        label: "Casting Time",
+        accessor: (spell) => {
+          if (!spell.time?.[0]) return "—"
+          const time = spell.time[0]
+          return `${time.number} ${time.unit}${time.number > 1 ? "s" : ""}`
+        },
+        sortable: true,
+        sortValue: (spell) => {
+          if (!spell.time?.[0]) return ""
+          const time = spell.time[0]
+          return `${time.number}-${time.unit}`
+        },
+        minWidth: "150px"
+      },
+      {
+        id: "range",
+        label: "Range",
+        accessor: (spell) => formatRange(spell.range),
+        sortable: true,
+        sortValue: (spell) => formatRange(spell.range),
+        minWidth: "140px"
+      },
+      {
+        id: "components",
+        label: "Components",
+        accessor: (spell) => {
+          const components = []
+          if (spell.components?.v) components.push("V")
+          if (spell.components?.s) components.push("S")
+          if (spell.components?.m) components.push("M")
+          return components.join(", ") || "—"
+        },
+        defaultVisible: false,
+        minWidth: "120px"
+      },
+      {
+        id: "source",
+        label: "Source",
+        accessor: (spell) => `${spell.source}${spell.page ? ` • p.${spell.page}` : ""}`,
+        sortable: true,
+        sortValue: (spell) => spell.source ?? "",
+        minWidth: "160px"
+      }
+    ],
+    []
+  )
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading spells...</p>
+      <div className="flex h-full items-center justify-center">
+        <div className="flex flex-col items-center space-y-3 text-gray-600 dark:text-gray-300">
+          <Loader2 className="h-10 w-10 animate-spin text-primary-600" />
+          <p>Loading spells…</p>
         </div>
       </div>
     )
   }
 
-  const stats = getSpellStats()
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-dark-900 dark:to-dark-800">
-      {/* Header Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-700 text-white">
-        <div className="container-fluid py-16">
-          <div className="flex items-center justify-center mb-6">
-            <div className="p-4 bg-white bg-opacity-20 rounded-full">
-              <Zap size={48} />
+    <div className="flex h-full flex-col bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-dark-900 dark:via-dark-900 dark:to-dark-950">
+      <header className="border-b border-gray-200/70 dark:border-dark-700/60 bg-white/80 dark:bg-dark-900/70 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
+          <div className="flex items-center gap-4">
+            <div className="rounded-2xl bg-primary-600/90 p-4 text-white shadow-lg">
+              <Sparkles size={32} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-semibold text-gray-900 dark:text-gray-100">Spell Compendium</h1>
+              <p className="mt-2 max-w-3xl text-sm text-gray-600 dark:text-gray-400">
+                Explore every spell in the 5e ruleset, tailor your results with precision filters, and drill into full spell details with a single click.
+              </p>
             </div>
           </div>
-          <h1 className="text-4xl md:text-6xl font-bold text-center mb-4 font-fantasy">
-            Spells Compendium
-          </h1>
-          <p className="text-xl text-center max-w-3xl mx-auto mb-8 opacity-90">
-            Master the arcane arts with our complete collection of D&D 5e spells. 
-            From simple cantrips to reality-bending 9th level magic.
-          </p>
-          
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-            <div className="text-center bg-white bg-opacity-10 rounded-lg p-4">
-              <div className="text-2xl font-bold">{stats.total.toLocaleString()}</div>
-              <div className="text-sm opacity-80">Total Spells</div>
-            </div>
-            <div className="text-center bg-white bg-opacity-10 rounded-lg p-4">
-              <div className="text-2xl font-bold">{stats.cantrips.toLocaleString()}</div>
-              <div className="text-sm opacity-80">Cantrips</div>
-            </div>
-            <div className="text-center bg-white bg-opacity-10 rounded-lg p-4">
-              <div className="text-2xl font-bold">{stats.highLevel.toLocaleString()}</div>
-              <div className="text-sm opacity-80">High Level (6+)</div>
-            </div>
-            <div className="text-center bg-white bg-opacity-10 rounded-lg p-4">
-              <div className="text-2xl font-bold">{stats.schools}</div>
-              <div className="text-sm opacity-80">Schools</div>
-            </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {spellStats.map((stat) => (
+              <div key={stat.label} className="rounded-2xl border border-gray-200/60 bg-white/70 px-4 py-3 text-center shadow-sm dark:border-dark-700/60 dark:bg-dark-900/60">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{stat.label}</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900 dark:text-gray-100">{stat.value}</p>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Controls Section */}
-      <div className="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700 sticky top-0 z-10">
-        <div className="container-fluid py-4">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            {/* Search */}
-            <div className="flex-1 max-w-2xl">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="text"
-                  placeholder="Search spells by name, description, or effect..."
-                  value={searchQuery}
-                  onChange={(e) => onSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+      <div className="flex flex-1 overflow-hidden">
+        {showFilters && (
+          <aside className="hidden w-72 shrink-0 border-r border-gray-200/70 bg-white/80 backdrop-blur dark:border-dark-700/70 dark:bg-dark-900/70 lg:block">
+            <FilterPanel filters={filters} filterOptions={filterOptions} onFilterChange={handleFilterChange} category="spells" />
+          </aside>
+        )}
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6">
+            <div className="rounded-2xl border border-gray-200/70 bg-white/80 p-4 shadow-sm dark:border-dark-700/60 dark:bg-dark-900/70">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(event) => onSearch(event.target.value)}
+                    placeholder="Search spells by name, effect, or description…"
+                    className="w-full rounded-full border border-gray-200 bg-white px-12 py-3 text-sm font-medium text-gray-800 shadow-sm transition focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-200 dark:border-dark-700 dark:bg-dark-800 dark:text-gray-100"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowFilters((value) => !value)}
+                    className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:border-primary-200 hover:text-primary-700 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-200 dark:hover:border-primary-700"
+                  >
+                    <Filter size={16} />
+                    Filters
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Sort and Filter Controls */}
-            <div className="flex items-center space-x-4">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="px-4 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="name">Name (A-Z)</option>
-                <option value="level">Spell Level</option>
-                <option value="school">School</option>
-                <option value="source">Source</option>
-              </select>
+            <DataTable
+              data={filteredSpells}
+              columns={columns}
+              initialSort={{ columnId: "name" }}
+              onRowClick={(spell) => setSelectedSpell(spell)}
+              emptyState={
+                <div className="py-16 text-center text-sm text-gray-500 dark:text-gray-400">
+                  No spells match your current filters.
+                </div>
+              }
+            />
+          </div>
+        </main>
+      </div>
 
+      {showFilters && (
+        <div className="lg:hidden">
+          <div className="fixed inset-0 z-40 bg-gray-900/40 backdrop-blur-sm" onClick={() => setShowFilters(false)} />
+          <div className="fixed inset-y-0 right-0 z-50 flex w-72 max-w-full">
+            <div className="relative flex-1 overflow-y-auto border-l border-gray-200 bg-white shadow-xl dark:border-dark-700 dark:bg-dark-900">
               <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`p-2 rounded-lg transition-colors duration-200 ${
-                  showFilters 
-                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                    : 'bg-gray-100 dark:bg-dark-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-dark-600'
-                }`}
+                type="button"
+                className="absolute right-3 top-3 rounded-full border border-gray-200 bg-white p-1.5 text-gray-500 shadow-sm hover:text-gray-900 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300 dark:hover:text-gray-100"
+                onClick={() => setShowFilters(false)}
+                aria-label="Close filters"
               >
-                <Filter size={20} />
+                ×
               </button>
+              <FilterPanel filters={filters} filterOptions={filterOptions} onFilterChange={handleFilterChange} category="spells" />
             </div>
           </div>
-
-          {/* Results count */}
-          <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">
-            Showing {filteredSpells.length.toLocaleString()} of {spells.length.toLocaleString()} spells
-          </div>
         </div>
-      </div>
+      )}
 
-      {/* Content Area */}
-      <div className="flex">
-        {/* Filter Sidebar */}
-        {showFilters && (
-          <FilterPanel
-            filters={filters}
-            filterOptions={filterOptions}
-            onFilterChange={handleFilterChange}
-            category="spells"
-          />
-        )}
-
-        {/* Spells Grid */}
-        <div className="flex-1 p-6">
-          {filteredSpells.length === 0 ? (
-            <div className="text-center py-16">
-              <BookOpen className="mx-auto mb-4 text-gray-400" size={64} />
-              <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">
-                No spells found
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                Try adjusting your search terms or filters
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredSpells.map((spell, index) => (
-                <SpellCard
-                  key={`${spell.name}-${spell.source}-${index}`}
-                  spell={spell}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      <DetailDrawer
+        open={Boolean(selectedSpell)}
+        onClose={() => setSelectedSpell(null)}
+        title={selectedSpell?.name ?? ""}
+        subtitle={selectedSpell ? `${formatSpellLevel(selectedSpell.level ?? 0)} • ${getSchoolName(selectedSpell.school ?? "")}` : undefined}
+      >
+        {selectedSpell && <SpellDetail spell={selectedSpell} />}
+      </DetailDrawer>
     </div>
   )
 }
+
