@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".test-build",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "jsx": "react-jsx",
+    "target": "es2022"
+  },
+  "include": [
+    "app/data/ClientTable.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx"
+  ]
+}
