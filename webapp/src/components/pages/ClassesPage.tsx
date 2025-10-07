@@ -111,7 +111,14 @@ export function ClassesPage({ searchQuery, onSearch }: ClassesPageProps) {
       {
         id: "primary",
         label: "Primary Ability",
-        accessor: (klass) => (klass.primaryAbility ? klass.primaryAbility.map((ability: string) => ability.toUpperCase()).join(", ") : "—"),
+        accessor: (klass) => {
+          const primary = Array.isArray(klass.primaryAbility)
+            ? klass.primaryAbility
+            : klass.primaryAbility
+            ? [klass.primaryAbility]
+            : []
+          return primary.length ? primary.map((ability: string) => ability.toUpperCase()).join(", ") : "—"
+        },
         defaultVisible: true,
         minWidth: "160px"
       },

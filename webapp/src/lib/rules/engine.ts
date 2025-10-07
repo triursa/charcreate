@@ -151,7 +151,7 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
   // Use ancestryData from state if present, else fallback to ancestryMap
   const ancestry = state.ancestryData ?? (state.ancestryId ? ancestryMap[state.ancestryId] : undefined)
   const background = state.backgroundData
-  const cls = state.classId ? classMap[state.classId] : undefined
+  const cls = state.classData ?? (state.classId ? classMap[state.classId] : undefined)
 
   const racialBonuses = emptyAbilityRecord()
   if (ancestry) {
@@ -192,6 +192,7 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
   const armorProficiencies = new Set<string>()
   const weaponProficiencies = new Set<string>()
   const toolProficiencies = new Set<string>()
+  const otherProficiencies = new Set<string>()
   const pendingDecisions: Decision[] = []
   const warnings: string[] = []
   const history: LevelSnapshot[] = []
@@ -311,7 +312,15 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
     if (Array.isArray(cls.toolProficiencies)) {
       cls.toolProficiencies.forEach((prof: any) => toolProficiencies.add(prof))
     }
+    if (Array.isArray(cls.otherProficiencies)) {
+      cls.otherProficiencies.forEach((prof: any) => otherProficiencies.add(prof))
+    }
   }
+
+  const subclassOptions = cls?.subclasses ?? []
+  const subclassLevel = cls?.subclassLevel ?? 0
+  const subclassDecisionId = cls ? `${cls.id}-subclass-choice` : undefined
+  let chosenSubclassId: string | undefined
 
   for (let level = 1; level <= state.level; level += 1) {
     if (!cls) {
@@ -398,6 +407,27 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
       }
     }
 
+    if (subclassOptions.length > 0 && subclassDecisionId && subclassLevel > 0 && level === subclassLevel) {
+      const decision: Decision = {
+        id: subclassDecisionId,
+        type: 'choose-subclass',
+        options: subclassOptions,
+        min: 1,
+        max: 1,
+        label: 'Choose a subclass'
+      }
+      snapshot.decisionsRaised.push(decision)
+
+      const resolved = state.resolvedDecisions[subclassDecisionId] as DecisionValue | undefined
+      if (resolved && resolved.type === 'choose-subclass') {
+        chosenSubclassId = resolved.choice
+      } else if (subclassOptions.length === 1) {
+        chosenSubclassId = subclassOptions[0]?.id
+      } else {
+        pendingDecisions.push(decision)
+      }
+    }
+
     history.push(snapshot)
   }
 
@@ -432,7 +462,15 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
       total: abilityTotals
     },
     level: totalLevelsProcessed,
-    classes: cls ? [{ classId: cls.id, levels: totalLevelsProcessed }] : [],
+    classes: cls
+      ? [
+          {
+            classId: cls.id,
+            levels: totalLevelsProcessed,
+            subclassId: chosenSubclassId
+          }
+        ]
+      : [],
     profBonus: proficiency,
     hp,
     ac,
@@ -448,7 +486,8 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
     proficiencies: {
       armor: Array.from(armorProficiencies),
       weapons: Array.from(weaponProficiencies),
-      tools: Array.from(toolProficiencies)
+      tools: Array.from(toolProficiencies),
+      other: Array.from(otherProficiencies)
     },
     features: mergeFeatures(features),
     decisions: pendingDecisions,

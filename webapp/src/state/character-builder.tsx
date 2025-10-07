@@ -4,6 +4,7 @@ import { createContext, useContext, useMemo, useReducer } from 'react'
 
 import { abilityList } from '@/lib/abilities'
 import { buildCharacter } from '@/lib/rules/engine'
+import type { ClassDefinition } from '@/data/classes'
 import type { Character, Decision } from '@/types/character'
 import type { Ability, Skill } from '@/types/character'
 
@@ -29,6 +30,7 @@ export type ResolvedDecisionValue =
   | { type: 'choose-feat'; featId: string }
   | { type: 'asi'; mode: 'ability'; abilities: Ability[] }
   | { type: 'asi'; mode: 'feat'; featId: string; abilitySelection?: Ability }
+  | { type: 'choose-subclass'; choice: string }
   | { type: 'custom'; data: unknown }
 
 export interface CharacterBuilderState {
@@ -41,8 +43,9 @@ export interface CharacterBuilderState {
   backgroundId?: string
   backgroundData?: any // Store full background object
   classId?: string
+  classData?: ClassDefinition
   level: number
-  resolvedDecisions: Record<string, ResolvedDecisionValue>
+  resolvedDecisions: Partial<Record<string, ResolvedDecisionValue>>
 }
 
 const defaultBaseAbilities: Record<Ability, number> = {
@@ -69,6 +72,7 @@ const initialState: CharacterBuilderState = {
   baseAbilities: { ...defaultBaseAbilities },
   ancestryId: undefined,
   classId: 'fighter',
+  classData: undefined,
   level: 1,
   resolvedDecisions: {}
 }
@@ -80,7 +84,7 @@ type Action =
   | { type: 'APPLY_BOSS_ARRAY' }
   | { type: 'SET_ANCESTRY'; payload: string | undefined | any }
   | { type: 'SET_BACKGROUND'; payload: string | undefined | any }
-  | { type: 'SET_CLASS'; payload: string | undefined }
+  | { type: 'SET_CLASS'; payload: string | undefined | ClassDefinition }
   | { type: 'SET_LEVEL'; payload: number }
   | { type: 'RESOLVE_DECISION'; id: string; value: ResolvedDecisionValue }
   | { type: 'CLEAR_DECISION'; id: string }
@@ -152,9 +156,18 @@ function reducer(state: CharacterBuilderState, action: Action): CharacterBuilder
       }
     }
     case 'SET_CLASS':
+      if (typeof action.payload === 'object' && action.payload !== null) {
+        return {
+          ...state,
+          classId: action.payload.id,
+          classData: action.payload,
+          resolvedDecisions: {}
+        }
+      }
       return {
         ...state,
         classId: action.payload ?? state.classId,
+        classData: undefined,
         resolvedDecisions: {}
       }
     case 'SET_LEVEL':
@@ -195,7 +208,7 @@ interface CharacterBuilderContextValue {
     applyBossArray: () => void
     setAncestry: (id: string | undefined | any) => void
     setBackground: (id: string | undefined | any) => void
-    setClass: (id: string | undefined) => void
+    setClass: (id: string | undefined | ClassDefinition) => void
     setLevel: (level: number) => void
     resolveDecision: (id: string, value: ResolvedDecisionValue) => void
     clearDecision: (id: string) => void
@@ -218,7 +231,7 @@ export function CharacterBuilderProvider({ children }: { children: React.ReactNo
       applyBossArray: () => dispatch({ type: 'APPLY_BOSS_ARRAY' }),
       setAncestry: (id: string | undefined | any) => dispatch({ type: 'SET_ANCESTRY', payload: id }),
       setBackground: (id: string | undefined | any) => dispatch({ type: 'SET_BACKGROUND', payload: id }),
-      setClass: (id: string | undefined) => dispatch({ type: 'SET_CLASS', payload: id }),
+      setClass: (id: string | undefined | ClassDefinition) => dispatch({ type: 'SET_CLASS', payload: id }),
       setLevel: (level: number) => dispatch({ type: 'SET_LEVEL', payload: level }),
       resolveDecision: (id: string, value: ResolvedDecisionValue) =>
         dispatch({ type: 'RESOLVE_DECISION', id, value }),

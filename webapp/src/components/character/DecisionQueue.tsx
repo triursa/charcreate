@@ -31,7 +31,12 @@ interface ToolDraft {
   tools: string[]
 }
 
-type Draft = SkillDraft | AsiDraft | LanguageDraft | ToolDraft
+interface SubclassDraft {
+  type: 'choose-subclass'
+  choice: string
+}
+
+type Draft = SkillDraft | AsiDraft | LanguageDraft | ToolDraft | SubclassDraft
 
 export function DecisionQueue() {
   const {
@@ -111,6 +116,18 @@ export function DecisionQueue() {
           } else {
             next[decision.id] = { type: 'asi', mode: 'ability', abilities: ['', ''] }
           }
+        } else if (decision.type === 'choose-subclass') {
+          const existing = current[decision.id] as SubclassDraft | undefined
+          if (existing) {
+            next[decision.id] = existing
+            continue
+          }
+          const resolved = resolvedDecisions[decision.id] as ResolvedDecisionValue | undefined
+          if (resolved && resolved.type === 'choose-subclass') {
+            next[decision.id] = { type: 'choose-subclass', choice: resolved.choice }
+          } else {
+            next[decision.id] = { type: 'choose-subclass', choice: '' }
+          }
         }
       }
       return next
@@ -182,6 +199,13 @@ export function DecisionQueue() {
         [decision.id]: { type: 'choose-tool', tools: Array.from(tools) }
       }
     })
+  }
+
+  const handleSubclassSelect = (decisionId: string, subclassId: string) => {
+    setDrafts((current) => ({
+      ...current,
+      [decisionId]: { type: 'choose-subclass', choice: subclassId }
+    }))
   }
 
   const handleAsiChange = (decisionId: string, index: number, ability: string) => {
@@ -282,6 +306,16 @@ export function DecisionQueue() {
         return
       }
       actions.resolveDecision(decision.id, { type: 'choose-tool', choices: draft.tools })
+      setErrors((current) => ({ ...current, [decision.id]: undefined }))
+      return
+    }
+
+    if (decision.type === 'choose-subclass' && draft.type === 'choose-subclass') {
+      if (!draft.choice) {
+        setErrors((current) => ({ ...current, [decision.id]: 'Choose a subclass.' }))
+        return
+      }
+      actions.resolveDecision(decision.id, { type: 'choose-subclass', choice: draft.choice })
       setErrors((current) => ({ ...current, [decision.id]: undefined }))
       return
     }
@@ -459,6 +493,32 @@ export function DecisionQueue() {
                       </label>
                     )
                   })}
+                </div>
+              )}
+
+              {decision.type === 'choose-subclass' && draft?.type === 'choose-subclass' && (
+                <div className="mt-3 space-y-2 text-sm">
+                  <select
+                    value={draft.choice}
+                    onChange={(event) => handleSubclassSelect(decision.id, event.target.value)}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  >
+                    <option value="">Select a subclass</option>
+                    {decision.options.map((option: any) => (
+                      <option key={option.id ?? option.name} value={option.id ?? option.name}>
+                        {option.name ?? option.id}
+                      </option>
+                    ))}
+                  </select>
+                  {draft.choice && (
+                    <p className="rounded-lg bg-slate-100 p-3 text-xs text-slate-600 dark:bg-slate-800/80 dark:text-slate-300">
+                      {
+                        decision.options.find(
+                          (option: any) => (option.id ?? option.name) === draft.choice
+                        )?.description ?? ''
+                      }
+                    </p>
+                  )}
                 </div>
               )}
 
