@@ -1,13 +1,18 @@
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Allow importing JSON files from the data directory
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@data': require('path').resolve(__dirname, '../data'),
+      '@data': path.resolve(__dirname, '../data')
     }
     return config
-  },
+  }
 }
 
-module.exports = nextConfig
+export default nextConfig
