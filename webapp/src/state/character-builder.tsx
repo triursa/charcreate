@@ -41,9 +41,9 @@ export interface CharacterBuilderState {
   abilityMethod: AbilityMethod
   baseAbilities: Record<Ability, number>
   ancestryId?: string
-  ancestryData?: any // Store full race object
+  ancestryData?: import('@/data/ancestries').AncestryDefinition
   backgroundId?: string
-  backgroundData?: any // Store full background object
+  backgroundData?: import('@/types/dnd').Background
   classId?: string
   classData?: ClassDefinition
   level: number

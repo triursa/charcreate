@@ -262,7 +262,7 @@ export function GuidedCharacterLayout() {
       {
         id: 'ancestry',
         title: 'Ancestry',
-        description: 'Choose the lineage that shapes your hero\'s culture and traits.',
+        description: 'Choose the lineage that shapes your hero&apos;s culture and traits.',
         render: () => (
           <div className="space-y-4">
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -330,7 +330,7 @@ export function GuidedCharacterLayout() {
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Choose a Background</h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                Backgrounds grant proficiencies, gear, and roleplaying hooks that inform your hero\'s past.
+                Backgrounds grant proficiencies, gear, and roleplaying hooks that inform your hero&apos;s past.
               </p>
               <div className="mt-4 space-y-4">
                 <div className="rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/80">
@@ -519,7 +519,8 @@ export function GuidedCharacterLayout() {
       selectedAncestry,
       selectedBackground,
       ancestryError,
-      backgroundError
+      backgroundError,
+      actions
     ]
   )
 
@@ -632,6 +633,7 @@ export function GuidedCharacterLayout() {
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       <SelectionModal

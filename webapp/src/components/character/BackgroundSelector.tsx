@@ -14,7 +14,7 @@ export type BackgroundRecord = {
 
 interface BackgroundSelectorProps {
   backgrounds: BackgroundRecord[]
-  searchTerm: string
+  searchTerm?: string
   traitFilter?: string
   originFilter?: string
   selectedId?: string | null
@@ -136,37 +136,38 @@ export function getBackgroundSummary(background: BackgroundRecord): string {
   return buildSummary(background)
 }
 
-export function BackgroundSelector({
-  backgrounds,
-  searchTerm,
-  traitFilter = "all",
-  originFilter = "all",
-  selectedId,
-  onSelect
-}: BackgroundSelectorProps) {
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+export function BackgroundSelector(props: BackgroundSelectorProps) {
+  const {
+    backgrounds = [],
+    searchTerm = "",
+    traitFilter = "all",
+    originFilter = "all",
+    selectedId,
+    onSelect
+  } = props;
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const filteredBackgrounds = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase()
+    const normalizedSearch = searchTerm.trim().toLowerCase();
 
-    return backgrounds.filter((background) => {
-      const summary = buildSummary(background)
+    return backgrounds.filter((background: BackgroundRecord) => {
+      const summary = buildSummary(background);
       const matchesSearch =
         normalizedSearch.length === 0 ||
         background.name.toLowerCase().includes(normalizedSearch) ||
-        summary.toLowerCase().includes(normalizedSearch)
+        summary.toLowerCase().includes(normalizedSearch);
 
-      const skills = parseList(background.skillProficiencies).map((skill) => skill.toLowerCase())
+      const skills = parseList(background.skillProficiencies).map((skill: string) => skill.toLowerCase());
       const matchesTrait =
-        traitFilter === "all" || skills.some((skill) => skill.includes(traitFilter.toLowerCase()))
+        traitFilter === "all" || skills.some((skill: string) => skill.includes(traitFilter.toLowerCase()));
 
-      const originValue = background.source ?? ""
+      const originValue = background.source ?? "";
       const matchesOrigin =
-        originFilter === "all" || originValue.toLowerCase().includes(originFilter.toLowerCase())
+        originFilter === "all" || originValue.toLowerCase().includes(originFilter.toLowerCase());
 
-      return matchesSearch && matchesTrait && matchesOrigin
-    })
-  }, [backgrounds, originFilter, searchTerm, traitFilter])
+      return matchesSearch && matchesTrait && matchesOrigin;
+    });
+  }, [backgrounds, originFilter, searchTerm, traitFilter]);
 
   if (filteredBackgrounds.length === 0) {
     return (

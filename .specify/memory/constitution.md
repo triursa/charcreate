@@ -1,50 +1,40 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report
+Version change: none → 1.0.0
+Modified principles: [PRINCIPLE_1_NAME] → Simplicity, [PRINCIPLE_2_NAME] → Sleekness, [PRINCIPLE_3_NAME] → Responsiveness
+Added sections: Additional Constraints, Development Workflow
+Removed sections: none
+Templates requiring updates: ✅ plan-template.md, ✅ spec-template.md, ✅ tasks-template.md
+Follow-up TODOs: TODO(RATIFICATION_DATE): Set original ratification date if known
+-->
+
+# Character Builder Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### Simplicity
+Every feature, interface, and workflow MUST be as simple as possible. Avoid unnecessary complexity in code, UI, and user experience. Rationale: Simplicity enables maintainability, onboarding, and reliability.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### Sleekness
+Designs, interfaces, and outputs MUST be visually and functionally sleek. Prioritize clean layouts, modern aesthetics, and intuitive navigation. Rationale: Sleekness improves user satisfaction and project reputation.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### Responsiveness
+All components and workflows MUST be responsive to user input and device constraints. The application MUST deliver fast feedback and adapt gracefully to different screen sizes and environments. Rationale: Responsiveness ensures accessibility and usability for all users.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+## Additional Constraints
+- Technology stack: TypeScript, React, Next.js, Tailwind CSS
+- Code MUST be type-safe and linted before merge
+- All user-facing features MUST be accessible (WCAG AA minimum)
+- Data persistence MUST use secure, reliable storage
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+## Development Workflow
+- All code changes MUST be reviewed by at least one maintainer
+- Automated tests MUST cover all core logic and UI components
+- CI/CD pipeline MUST verify build, lint, and test status before deployment
+- Major UI/UX changes require user feedback or approval
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
-
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
-
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
-
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+The constitution supersedes all other practices. Amendments require documentation, approval by two maintainers, and a migration plan if breaking changes are introduced. All PRs and reviews MUST verify compliance with the constitution. Complexity must be justified in writing. Use README.md for runtime development guidance.
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
-
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE): Set original ratification date if known | **Last Amended**: 2025-10-07
