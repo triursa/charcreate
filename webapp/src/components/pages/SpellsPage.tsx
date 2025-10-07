@@ -1,15 +1,15 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Filter, Loader2, Sparkles, Search } from "lucide-react"
 
 import { DataTable, type ColumnConfig } from "@/components/DataTable"
 import { DetailDrawer } from "@/components/DetailDrawer"
 import { FilterPanel } from "@/components/FilterPanel"
 import { SpellDetail } from "@/components/details/SpellDetail"
-import { getContentByCategory } from "@/lib/clientDataLoader"
 import { searchAllContent, filterContent, getFilterOptions } from "@/lib/search"
 import { formatRange, formatSpellLevel, getSchoolName } from "@/lib/textParser"
+import { useContentData } from "@/state/content-data"
 
 interface SpellsPageProps {
   searchQuery: string
@@ -17,9 +17,12 @@ interface SpellsPageProps {
 }
 
 export function SpellsPage({ searchQuery, onSearch }: SpellsPageProps) {
-  const [spells, setSpells] = useState<any[]>([])
   const [filteredSpells, setFilteredSpells] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const { content, getCategoryData } = useContentData()
+  const cachedSpells = content.spells
+  const spells = useMemo(() => cachedSpells ?? [], [cachedSpells])
+  const hasLoadedSpells = cachedSpells !== undefined
+  const [loading, setLoading] = useState(!hasLoadedSpells)
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({
     source: [],
@@ -31,29 +34,39 @@ export function SpellsPage({ searchQuery, onSearch }: SpellsPageProps) {
   const [selectedSpell, setSelectedSpell] = useState<any | null>(null)
 
   useEffect(() => {
-    loadSpells()
-  }, [])
+    if (hasLoadedSpells) {
+      setLoading(false)
+      return
+    }
+
+    let isMounted = true
+
+    setLoading(true)
+    getCategoryData("spells")
+      .catch((error) => {
+        console.error("Error loading spells:", error)
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [getCategoryData, hasLoadedSpells])
 
   useEffect(() => {
-    applyFiltersAndSearch()
-  }, [searchQuery, filters, spells])
-
-  const loadSpells = async () => {
-    try {
-      setLoading(true)
-      const data = await getContentByCategory("spells")
-      setSpells(data)
-
-      const options = getFilterOptions(data, "spells")
-      setFilterOptions(options)
-    } catch (error) {
-      console.error("Error loading spells:", error)
-    } finally {
-      setLoading(false)
+    if (!hasLoadedSpells) {
+      return
     }
-  }
 
-  const applyFiltersAndSearch = () => {
+    const options = getFilterOptions(spells, "spells")
+    setFilterOptions(options)
+  }, [hasLoadedSpells, spells])
+
+  const applyFiltersAndSearch = useCallback(() => {
     let result = [...spells]
 
     if (searchQuery.trim()) {
@@ -66,7 +79,11 @@ export function SpellsPage({ searchQuery, onSearch }: SpellsPageProps) {
     result.sort((a, b) => (a.name || "").localeCompare(b.name || ""))
 
     setFilteredSpells(result)
-  }
+  }, [filters, searchQuery, spells])
+
+  useEffect(() => {
+    applyFiltersAndSearch()
+  }, [applyFiltersAndSearch])
 
   const handleFilterChange = (newFilters: any) => {
     setFilters(newFilters)

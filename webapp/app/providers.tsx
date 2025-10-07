@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
+import { ContentDataProvider } from '@/state/content-data'
+
 type Theme = 'light' | 'dark'
 
 interface ThemeContextType {
@@ -50,7 +52,7 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      {children}
+      <ContentDataProvider>{children}</ContentDataProvider>
     </ThemeContext.Provider>
   )
 }

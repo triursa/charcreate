@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Zap, Users, Shield, Scroll, Book, Map, Award, BarChart3, TrendingUp } from 'lucide-react'
-import { getContentStats, ContentStats } from '@/lib/clientDataLoader'
+import { ContentStats } from '@/lib/clientDataLoader'
 import { SpellsPage } from '@/components/pages/SpellsPage'
 import { RacesPage } from '@/components/pages/RacesPage'
 import { ClassesPage } from '@/components/pages/ClassesPage'
@@ -10,6 +10,7 @@ import { ItemsPage } from '@/components/pages/ItemsPage'
 import { BackgroundsPage } from '@/components/pages/BackgroundsPage'
 import { FeatsPage } from '@/components/pages/FeatsPage'
 import { ContentView } from '@/components/ContentView'
+import { useContentData } from '@/state/content-data'
 
 interface HomePageProps {
   selectedCategory: string | null
@@ -70,23 +71,38 @@ const categoryCards = [
 ]
 
 export function HomePage({ selectedCategory, onCategorySelect, searchQuery, onSearch }: HomePageProps) {
-  const [stats, setStats] = useState<ContentStats | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { stats: cachedStats, getStats } = useContentData()
+  const [stats, setStats] = useState<ContentStats | null>(cachedStats ?? null)
+  const [loading, setLoading] = useState(!cachedStats)
 
   useEffect(() => {
-    loadStats()
-  }, [])
-
-  const loadStats = async () => {
-    try {
-      const contentStats = await getContentStats()
-      setStats(contentStats)
-    } catch (error) {
-      console.error('Error loading stats:', error)
-    } finally {
+    if (cachedStats) {
+      setStats(cachedStats)
       setLoading(false)
+      return
     }
-  }
+
+    let isMounted = true
+
+    setLoading(true)
+    getStats()
+      .then((contentStats) => {
+        if (!isMounted) return
+        setStats(contentStats)
+      })
+      .catch((error) => {
+        console.error('Error loading stats:', error)
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [cachedStats, getStats])
 
   const formatNumber = (num: number): string => {
     return num.toLocaleString()
@@ -274,8 +290,8 @@ export function HomePage({ selectedCategory, onCategorySelect, searchQuery, onSe
                 Lightning Fast Search
               </h3>
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                Find any spell, item, or rule instantly with our advanced search engine. 
-                Fuzzy matching means you'll find what you need even with typos.
+                Find any spell, item, or rule instantly with our advanced search engine.
+                Fuzzy matching means you&rsquo;ll find what you need even with typos.
               </p>
             </div>
             
@@ -300,8 +316,8 @@ export function HomePage({ selectedCategory, onCategorySelect, searchQuery, onSe
                 Complete Collection
               </h3>
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                Every official D&D 5e sourcebook in one place. From the Player's Handbook 
-                to the latest releases, we've got you covered.
+                Every official D&D 5e sourcebook in one place. From the Player&rsquo;s Handbook
+                to the latest releases, we&rsquo;ve got you covered.
               </p>
             </div>
           </div>
