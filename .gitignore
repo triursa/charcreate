@@ -54,3 +54,6 @@ Thumbs.db
 
 # Data files (keep original line)
 data/*
+
+# Working Directory of Prisma headers
+prune/*

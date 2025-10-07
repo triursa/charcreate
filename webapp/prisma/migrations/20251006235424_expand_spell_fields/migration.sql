@@ -1,0 +1,10 @@
+-- AlterTable
+ALTER TABLE "Spell" ADD COLUMN "areaTags" JSONB;
+ALTER TABLE "Spell" ADD COLUMN "basicRules" BOOLEAN;
+ALTER TABLE "Spell" ADD COLUMN "damageInflict" JSONB;
+ALTER TABLE "Spell" ADD COLUMN "miscTags" JSONB;
+ALTER TABLE "Spell" ADD COLUMN "page" INTEGER;
+ALTER TABLE "Spell" ADD COLUMN "reprintedAs" JSONB;
+ALTER TABLE "Spell" ADD COLUMN "savingThrow" JSONB;
+ALTER TABLE "Spell" ADD COLUMN "scalingLevelDice" JSONB;
+ALTER TABLE "Spell" ADD COLUMN "srd" BOOLEAN;

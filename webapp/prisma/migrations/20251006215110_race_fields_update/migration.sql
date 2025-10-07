@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Race" ADD COLUMN "age" JSONB;
+ALTER TABLE "Race" ADD COLUMN "hasFluff" BOOLEAN;
+ALTER TABLE "Race" ADD COLUMN "hasFluffImages" BOOLEAN;
+ALTER TABLE "Race" ADD COLUMN "otherSources" JSONB;
+ALTER TABLE "Race" ADD COLUMN "reprintedAs" JSONB;
