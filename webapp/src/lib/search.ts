@@ -67,16 +67,31 @@ const searchConfigs = {
   }
 }
 
+const fuseCache = new Map<string, WeakMap<any[], Fuse<any>>>()
+
 /**
- * Create a search index for the given content type
+ * Create (or reuse) a search index for the given content type
  */
 export function createSearchIndex(content: any[], type: string) {
   const config = searchConfigs[type as keyof typeof searchConfigs]
   if (!config) {
     throw new Error(`No search configuration found for type: ${type}`)
   }
-  
-  return new Fuse(content, config)
+
+  let typeCache = fuseCache.get(type)
+  if (!typeCache) {
+    typeCache = new WeakMap<any[], Fuse<any>>()
+    fuseCache.set(type, typeCache)
+  }
+
+  const cached = typeCache.get(content)
+  if (cached) {
+    return cached
+  }
+
+  const fuse = new Fuse(content, config)
+  typeCache.set(content, fuse)
+  return fuse
 }
 
 /**

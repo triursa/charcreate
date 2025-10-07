@@ -1,15 +1,16 @@
 "use client"
 
-import { type ComponentType, useEffect, useMemo, useState } from "react"
+import { type ComponentType, useCallback, useEffect, useMemo, useState } from "react"
 import { BookOpen, Compass, Filter, Loader2, Map, Search as SearchIcon, Sparkles, Award } from "lucide-react"
 
 import { DataTable, type ColumnConfig } from "@/components/DataTable"
 import { DetailDrawer } from "@/components/DetailDrawer"
 import { FilterPanel } from "@/components/FilterPanel"
 import { GenericDetail } from "@/components/details/GenericDetail"
-import { loadAllContent } from "@/lib/clientDataLoader"
+import { CONTENT_CATEGORIES } from "@/lib/clientDataLoader"
 import { filterContent, getFilterOptions, searchAllContent } from "@/lib/search"
 import { extractPlainText } from "@/lib/textParser"
+import { hasAllCategories, isContentCategory, useContentData } from "@/state/content-data"
 
 interface ContentViewProps {
   category: string
@@ -61,10 +62,21 @@ const defaultConfig: CategoryConfig = {
 type RecordWithType = any & { _type?: string }
 
 export function ContentView({ category, searchQuery, onSearch }: ContentViewProps) {
-  const [allContent, setAllContent] = useState<Record<string, any[]>>({})
+  const { content: cachedContent, getAllContent, getCategoryData } = useContentData()
+  const isSearch = category === "search"
+  const knownCategory = isContentCategory(category)
+  const categoryData = cachedContent[category]
+  const hasCategoryData = categoryData !== undefined
+  const hasFullContent = hasAllCategories(cachedContent)
+
   const [content, setContent] = useState<RecordWithType[]>([])
   const [filteredContent, setFilteredContent] = useState<RecordWithType[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => {
+    if (isSearch || !knownCategory) {
+      return !hasFullContent
+    }
+    return !hasCategoryData
+  })
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({
     source: [],
@@ -75,9 +87,21 @@ export function ContentView({ category, searchQuery, onSearch }: ContentViewProp
   const [filterOptions, setFilterOptions] = useState<any>({})
   const [selectedRecord, setSelectedRecord] = useState<RecordWithType | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  const aggregatedContent = useMemo(() => {
+    const base: Record<string, any[]> = {}
+
+    CONTENT_CATEGORIES.forEach((contentCategory) => {
+      base[contentCategory] = cachedContent[contentCategory] ?? []
+    })
+
+    Object.entries(cachedContent).forEach(([key, value]) => {
+      if (!(key in base)) {
+        base[key] = value ?? []
+      }
+    })
+
+    return base
+  }, [cachedContent])
 
   useEffect(() => {
     setFilters({
@@ -89,51 +113,85 @@ export function ContentView({ category, searchQuery, onSearch }: ContentViewProp
   }, [category])
 
   useEffect(() => {
-    if (Object.keys(allContent).length === 0) return
+    let isMounted = true
 
-    if (category === "search") {
-      applySearch()
-    } else {
-      const categoryContent = allContent[category] || []
-      setContent(categoryContent)
-      const options = getFilterOptions(categoryContent, category)
-      setFilterOptions(options)
+    const ensureContent = async () => {
+      try {
+        if (isSearch) {
+          if (hasFullContent) {
+            setLoading(false)
+            return
+          }
 
-      const filtered = getFilteredCategoryContent(categoryContent)
-      setFilteredContent(filtered)
+          setLoading(true)
+          await getAllContent()
+          return
+        }
+
+        if (knownCategory) {
+          if (hasCategoryData) {
+            setLoading(false)
+            return
+          }
+
+          setLoading(true)
+          await getCategoryData(category)
+          return
+        }
+
+        if (hasFullContent) {
+          setLoading(false)
+          return
+        }
+
+        setLoading(true)
+        await getAllContent()
+      } catch (error) {
+        console.error("Error loading content:", error)
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
     }
-  }, [category, allContent])
+
+    ensureContent()
+
+    return () => {
+      isMounted = false
+    }
+  }, [category, getAllContent, getCategoryData, hasCategoryData, hasFullContent, isSearch, knownCategory])
 
   useEffect(() => {
-    if (category === "search") {
-      applySearch()
-    } else {
-      const filtered = getFilteredCategoryContent(content)
-      setFilteredContent(filtered)
+    if (isSearch) {
+      setContent([])
+      setFilterOptions({})
+      return
     }
-  }, [searchQuery, filters, content, category])
 
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      const data = await loadAllContent()
-      setAllContent(data)
-
-      if (category !== "search") {
-        const categoryContent = data[category] || []
-        setContent(categoryContent)
-        const options = getFilterOptions(categoryContent, category)
-        setFilterOptions(options)
-        setFilteredContent(getFilteredCategoryContent(categoryContent))
-      }
-    } catch (error) {
-      console.error("Error loading content:", error)
-    } finally {
-      setLoading(false)
+    if (!knownCategory) {
+      const data = aggregatedContent[category] || []
+      setContent(data)
+      setFilterOptions(getFilterOptions(data, category))
+      setFilteredContent(getFilteredCategoryContent(data))
+      return
     }
-  }
 
-  const getFilteredCategoryContent = (sourceContent: RecordWithType[]) => {
+    if (!hasCategoryData) {
+      setContent([])
+      setFilterOptions({})
+      setFilteredContent([])
+      return
+    }
+
+    const data = (categoryData ?? []) as RecordWithType[]
+    setContent(data)
+    const options = getFilterOptions(data, category)
+    setFilterOptions(options)
+    setFilteredContent(getFilteredCategoryContent(data))
+  }, [aggregatedContent, category, categoryData, getFilteredCategoryContent, hasCategoryData, isSearch, knownCategory])
+
+  const getFilteredCategoryContent = useCallback((sourceContent: RecordWithType[]) => {
     let result = [...sourceContent]
 
     if (searchQuery.trim()) {
@@ -144,15 +202,15 @@ export function ContentView({ category, searchQuery, onSearch }: ContentViewProp
     result = filterContent(result, category, filters)
     result.sort((a, b) => (a.name || a.title || "").localeCompare(b.name || b.title || ""))
     return result
-  }
+  }, [category, filters, searchQuery])
 
-  const applySearch = () => {
+  const applySearch = useCallback(() => {
     if (!searchQuery.trim()) {
       setFilteredContent([])
       return
     }
 
-    const results = searchAllContent(allContent, searchQuery, 200).map(({ item, type, score }) => ({
+    const results = searchAllContent(aggregatedContent, searchQuery, 200).map(({ item, type, score }) => ({
       ...item,
       _type: type,
       _score: score
@@ -160,7 +218,16 @@ export function ContentView({ category, searchQuery, onSearch }: ContentViewProp
 
     results.sort((a, b) => (a._score || 0) - (b._score || 0))
     setFilteredContent(results)
-  }
+  }, [aggregatedContent, searchQuery])
+
+  useEffect(() => {
+    if (isSearch) {
+      applySearch()
+    } else {
+      const filtered = getFilteredCategoryContent(content)
+      setFilteredContent(filtered)
+    }
+  }, [applySearch, category, content, getFilteredCategoryContent, isSearch, searchQuery])
 
   const handleFilterChange = (newFilters: any) => {
     setFilters(newFilters)
