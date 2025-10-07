@@ -1,185 +1,250 @@
+import { useMemo, useState } from "react"
+import { Info } from "lucide-react"
 
-import { useEffect, useState } from 'react'
-import { useCharacterBuilder } from '@/state/character-builder'
-
-type Race = {
+export interface AncestryRecord {
   id: string
   name: string
   source?: string
   size?: any
   speed?: any
   ability?: any
-  traitTags?: any
+  traitTags?: string[]
   languageProficiencies?: any
   entries?: any
 }
 
-export function AncestrySelector() {
-  const {
-    state: { ancestryId },
-    actions
-  } = useCharacterBuilder()
-  const [races, setRaces] = useState<Race[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+interface AncestrySelectorProps {
+  ancestries: AncestryRecord[]
+  searchTerm: string
+  traitFilter?: string
+  originFilter?: string
+  selectedId?: string | null
+  onSelect: (ancestry: AncestryRecord) => void
+}
 
-  useEffect(() => {
-    async function fetchRaces() {
-      try {
-        const res = await fetch('/api/races')
-        if (!res.ok) throw new Error('Failed to fetch races')
-        const data = await res.json()
-        setRaces(data)
-      } catch (err: any) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
+function formatAbilitySummary(ability: any): string | null {
+  if (!ability) return null
+
+  if (Array.isArray(ability)) {
+    const parts = ability
+      .map((entry) => {
+        if (typeof entry === "object" && entry !== null) {
+          return Object.entries(entry)
+            .filter(([_, value]) => typeof value === "number")
+            .map(([key, value]) => `${key.toUpperCase()} +${value}`)
+            .join(", ")
+        }
+        if (typeof entry === "string") {
+          return entry
+        }
+        return null
+      })
+      .filter(Boolean)
+
+    if (parts.length > 0) {
+      return parts.join(", ")
     }
-    fetchRaces()
-  }, [])
+  }
+
+  if (typeof ability === "object" && ability !== null) {
+    const numeric = Object.entries(ability)
+      .filter(([_, value]) => typeof value === "number")
+      .map(([key, value]) => `${key.toUpperCase()} +${value}`)
+
+    if (numeric.length > 0) {
+      return numeric.join(", ")
+    }
+  }
+
+  if (typeof ability === "string") {
+    return ability
+  }
+
+  return null
+}
+
+function formatSpeedSummary(speed: any): string | null {
+  if (!speed) return null
+
+  if (typeof speed === "number") {
+    return `${speed} ft speed`
+  }
+
+  if (typeof speed === "object") {
+    if (typeof speed.walk === "number") {
+      return `${speed.walk} ft speed`
+    }
+
+    const entries = Object.entries(speed)
+      .filter(([key]) => key !== "choose")
+      .map(([key, value]) => `${key} ${value}`)
+
+    if (entries.length > 0) {
+      return entries.join(", ")
+    }
+  }
+
+  return null
+}
+
+function flattenEntries(entries: any): string[] {
+  if (!entries) return []
+
+  if (typeof entries === "string") {
+    return [entries]
+  }
+
+  if (Array.isArray(entries)) {
+    return entries.flatMap((entry) => flattenEntries(entry)).filter(Boolean)
+  }
+
+  if (typeof entries === "object") {
+    if (Array.isArray(entries.entries)) {
+      return flattenEntries(entries.entries)
+    }
+
+    if (typeof entries.entries === "string") {
+      return [entries.entries]
+    }
+
+    const values = Object.values(entries)
+    if (values.length > 0) {
+      return values.flatMap((value) => flattenEntries(value)).filter(Boolean)
+    }
+  }
+
+  return []
+}
+
+function buildSummary(ancestry: AncestryRecord): string {
+  const abilitySummary = formatAbilitySummary(ancestry.ability)
+  const speedSummary = formatSpeedSummary(ancestry.speed)
+  const traitSummary = ancestry.traitTags?.slice(0, 2).join(", ")
+
+  const parts = [abilitySummary, speedSummary, traitSummary].filter(Boolean)
+
+  if (parts.length === 0) {
+    const entry = flattenEntries(ancestry.entries)[0]
+    if (entry) {
+      return entry.slice(0, 140)
+    }
+    return "No additional summary available"
+  }
+
+  return parts.join(" • ")
+}
+
+export function getAncestrySummary(ancestry: AncestryRecord): string {
+  return buildSummary(ancestry)
+}
+
+export function AncestrySelector({
+  ancestries,
+  searchTerm,
+  traitFilter = "all",
+  originFilter = "all",
+  selectedId,
+  onSelect
+}: AncestrySelectorProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const filteredAncestries = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+
+    return ancestries.filter((ancestry) => {
+      const matchesSearch =
+        normalizedSearch.length === 0 ||
+        ancestry.name.toLowerCase().includes(normalizedSearch) ||
+        buildSummary(ancestry).toLowerCase().includes(normalizedSearch)
+
+      const matchesTrait =
+        traitFilter === "all" ||
+        (Array.isArray(ancestry.traitTags) && ancestry.traitTags.some((tag) => tag.toLowerCase() === traitFilter.toLowerCase()))
+
+      const originValue = ancestry.source ?? ""
+      const matchesOrigin =
+        originFilter === "all" || originValue.toLowerCase().includes(originFilter.toLowerCase())
+
+      return matchesSearch && matchesTrait && matchesOrigin
+    })
+  }, [ancestries, originFilter, searchTerm, traitFilter])
+
+  if (filteredAncestries.length === 0) {
+    return (
+      <p className="text-sm text-slate-600 dark:text-slate-300">
+        No ancestries match your filters. Try adjusting the search text or filter values.
+      </p>
+    )
+  }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {loading ? (
-        <div>Loading races...</div>
-      ) : error ? (
-        <div className="text-red-500">Error: {error}</div>
-      ) : (
-        races.map((race) => (
+    <ul className="space-y-3" role="list">
+      {filteredAncestries.map((ancestry) => {
+        const summary = buildSummary(ancestry)
+        const detailParagraphs = flattenEntries(ancestry.entries)
+        const isExpanded = expandedId === ancestry.id
+        const detailId = `ancestry-detail-${ancestry.id}`
+
+        return (
+          <li key={ancestry.id}>
             <div
-              key={race.id}
-              className={`border rounded-lg p-4 cursor-pointer ${ancestryId === race.id ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950' : 'border-slate-300 bg-transparent dark:border-slate-600'}`}
-              onClick={() => actions.setAncestry(race)}
+              className={`rounded-xl border bg-white/60 p-4 shadow-sm transition dark:bg-slate-900/70 ${
+                selectedId === ancestry.id
+                  ? "border-blue-500 ring-2 ring-blue-200 dark:border-blue-400 dark:ring-blue-500/40"
+                  : "border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-500"
+              }`}
             >
-              <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">{race.name}</h3>
-              {race.source && <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">{race.source}</p>}
-              
-              {/* Display ability score increases */}
-              {race.ability && (
-                <div className="mt-2">
-                  <span className="font-semibold text-sm">Ability Bonuses:</span>
-                  <div className="ml-2 text-sm">
-                    {Array.isArray(race.ability) ? (
-                      race.ability.map((abilityItem: any, i: number) => {
-                        if (typeof abilityItem === 'object' && abilityItem !== null) {
-                          return Object.entries(abilityItem).map(([ability, value]: [string, any]) => {
-                            // Only render if value is a number
-                            if (typeof value === 'number') {
-                              return (
-                                <span key={`${i}-${ability}`} className="mr-3">
-                                  {ability.toUpperCase()}: +{value}
-                                </span>
-                              );
-                            }
-                            return null;
-                          });
-                        } else if (typeof abilityItem === 'string') {
-                          return <span key={i} className="mr-3">{abilityItem}</span>;
-                        }
-                        return null;
-                      }).flat().filter(Boolean)
-                    ) : (
-                      <span>Unable to parse ability data</span>
-                    )}
+              <div className="flex items-start gap-3">
+                <button
+                  type="button"
+                  onClick={() => onSelect(ancestry)}
+                  className="flex-1 text-left"
+                  aria-pressed={selectedId === ancestry.id}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{ancestry.name}</h3>
+                      {ancestry.source && (
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          {ancestry.source}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{summary}</p>
+                </button>
 
-              {/* Display speed */}
-              {race.speed && (
-                <div className="mt-2">
-                  <span className="font-semibold text-sm">Speed:</span>
-                  <span className="ml-2 text-sm">
-                    {(() => {
-                      if (typeof race.speed === 'object' && race.speed !== null) {
-                        if (race.speed.walk) {
-                          return `${race.speed.walk} ft`;
-                        } else if (typeof race.speed === 'number') {
-                          return `${race.speed} ft`;
-                        } else {
-                          // Handle other speed types
-                          const speedEntries = Object.entries(race.speed)
-                            .map(([type, value]) => `${type}: ${value} ft`)
-                            .join(', ');
-                          return speedEntries || 'Unknown speed';
-                        }
-                      } else if (typeof race.speed === 'number') {
-                        return `${race.speed} ft`;
-                      } else {
-                        return 'Unknown speed';
-                      }
-                    })()}
-                  </span>
-                </div>
-              )}
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setExpandedId((current) => (current === ancestry.id ? null : ancestry.id))
+                  }}
+                  aria-expanded={isExpanded}
+                  aria-controls={detailId}
+                  className="rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-slate-100"
+                >
+                  <Info size={16} />
+                  <span className="sr-only">Toggle details for {ancestry.name}</span>
+                </button>
+              </div>
 
-              {/* Display size */}
-              {race.size && (
-                <div className="mt-2">
-                  <span className="font-semibold text-sm">Size:</span>
-                  <span className="ml-2 text-sm">
-                    {(() => {
-                      if (Array.isArray(race.size)) {
-                        return race.size.join(', ');
-                      } else if (typeof race.size === 'string') {
-                        return race.size;
-                      } else if (typeof race.size === 'object' && race.size !== null) {
-                        // Handle size objects - look for common properties
-                        if (race.size.size) return race.size.size;
-                        if (race.size.name) return race.size.name;
-                        return Object.values(race.size).join(', ');
-                      } else {
-                        return 'Unknown size';
-                      }
-                    })()}
-                  </span>
-                </div>
-              )}
-
-              {/* Display language proficiencies */}
-              {race.languageProficiencies && (
-                <div className="mt-2">
-                  <span className="font-semibold text-sm">Languages:</span>
-                  <div className="ml-2 text-sm">
-                    {Array.isArray(race.languageProficiencies) ? (
-                      race.languageProficiencies.map((langItem: any, i: number) => (
-                        <div key={i}>
-                          {(() => {
-                            if (typeof langItem === 'string') {
-                              return langItem;
-                            } else if (typeof langItem === 'object' && langItem !== null) {
-                              // Handle language objects - look for common properties
-                              if (langItem.language) return langItem.language;
-                              if (langItem.name) return langItem.name;
-                              if (langItem.choose) {
-                                return `Choose ${langItem.choose.count || 'any'} from ${JSON.stringify(langItem.choose.from || 'any languages')}`;
-                              }
-                              return 'Custom language choice';
-                            }
-                            return 'Unknown language';
-                          })()}
-                        </div>
-                      ))
-                    ) : (
-                      <div>No languages specified</div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Display trait tags as features */}
-              {race.traitTags && Array.isArray(race.traitTags) && race.traitTags.length > 0 && (
-                <div className="mt-2">
-                  <span className="font-semibold text-sm">Traits:</span>
-                  <div className="ml-2 text-sm">
-                    {race.traitTags.join(', ')}
-                  </div>
+              {isExpanded && detailParagraphs.length > 0 && (
+                <div
+                  id={detailId}
+                  role="region"
+                  aria-live="polite"
+                  className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
+                >
+                  {detailParagraphs.map((paragraph, index) => (
+                    <p key={index}>{paragraph}</p>
+                  ))}
                 </div>
               )}
             </div>
-          ))
-        )}
-    </div>
+          </li>
+        )
+      })}
+    </ul>
   )
 }
