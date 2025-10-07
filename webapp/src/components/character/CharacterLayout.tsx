@@ -1,20 +1,41 @@
 'use client'
 
-import { OverviewCard } from '@/components/character/OverviewCard'
-import { AbilityGrid } from '@/components/character/AbilityGrid'
-import { CharacterOptionsTabbed } from '@/components/character/CharacterOptionsTabbed'
-import { ClassLeveler } from '@/components/character/ClassLeveler'
-import { StatsPanel } from '@/components/character/StatsPanel'
-import { SkillsTable } from '@/components/character/SkillsTable'
-import { SavesList } from '@/components/character/SavesList'
-import { LevelTimeline } from '@/components/character/LevelTimeline'
-import { DecisionQueue } from '@/components/character/DecisionQueue'
-import { FeatureList } from '@/components/character/FeatureList'
+import { useEffect, useState } from 'react'
+
+import { AdvancedCharacterLayout } from '@/components/character/AdvancedCharacterLayout'
 import { ExportPanel } from '@/components/character/ExportPanel'
+import { GuidedCharacterLayout } from '@/components/character/GuidedCharacterLayout'
 import { useCharacterBuilder } from '@/state/character-builder'
+
+type ViewMode = 'guided' | 'advanced'
+
+const VIEW_MODE_STORAGE_KEY = 'character-planner:view-mode'
 
 export function CharacterLayout() {
   const { warnings } = useCharacterBuilder()
+  const [viewMode, setViewMode] = useState<ViewMode>('advanced')
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const storedMode = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY)
+
+    if (storedMode === 'guided' || storedMode === 'advanced') {
+      setViewMode(storedMode)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode)
+  }, [viewMode])
+
+  const isAdvancedView = viewMode === 'advanced'
 
   return (
     <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
@@ -26,7 +47,39 @@ export function CharacterLayout() {
             exports.
           </p>
         </div>
-        <ExportPanel />
+        <div className="flex items-center gap-4">
+          <div
+            role="group"
+            aria-label="Character planner view mode"
+            className="inline-flex items-center rounded-lg border border-slate-300 bg-white p-1 text-sm dark:border-slate-700 dark:bg-slate-900"
+          >
+            <button
+              type="button"
+              onClick={() => setViewMode('guided')}
+              className={`rounded-md px-3 py-1.5 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 ${
+                viewMode === 'guided'
+                  ? 'bg-slate-900 text-white shadow-sm dark:bg-slate-100 dark:text-slate-900'
+                  : 'text-slate-600 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
+              }`}
+              aria-pressed={viewMode === 'guided'}
+            >
+              Guided
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('advanced')}
+              className={`rounded-md px-3 py-1.5 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 ${
+                isAdvancedView
+                  ? 'bg-slate-900 text-white shadow-sm dark:bg-slate-100 dark:text-slate-900'
+                  : 'text-slate-600 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
+              }`}
+              aria-pressed={isAdvancedView}
+            >
+              Advanced
+            </button>
+          </div>
+          <ExportPanel />
+        </div>
       </div>
 
       {warnings.length > 0 && (
@@ -39,22 +92,7 @@ export function CharacterLayout() {
         </div>
       )}
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <OverviewCard />
-          <AbilityGrid />
-          <CharacterOptionsTabbed />
-          <ClassLeveler />
-          <LevelTimeline />
-        </div>
-        <div className="space-y-6">
-          <StatsPanel />
-          <SavesList />
-          <SkillsTable />
-          <FeatureList />
-          <DecisionQueue />
-        </div>
-      </div>
+      {isAdvancedView ? <AdvancedCharacterLayout /> : <GuidedCharacterLayout />}
     </div>
   )
 }
