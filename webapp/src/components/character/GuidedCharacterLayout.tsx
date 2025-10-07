@@ -12,6 +12,7 @@ import { FeatureList } from '@/components/character/FeatureList'
 import { OverviewCard } from '@/components/character/OverviewCard'
 import { StatsPanel } from '@/components/character/StatsPanel'
 import { useCharacterBuilder } from '@/state/character-builder'
+import { CharacterSheet } from '@/components/character/CharacterSheet'
 
 interface StepStatus {
   complete: boolean
@@ -199,11 +200,20 @@ export function GuidedCharacterLayout() {
       {
         id: 'summary',
         title: 'Summary',
-        description: 'Review your character\'s derived statistics and collected features.',
+        description: 'Review your full printable character sheet before exporting.',
         render: () => (
           <div className="space-y-6">
             <StatsPanel />
             <FeatureList />
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Printable Character Sheet</h2>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                This consolidated sheet displays the information that will be exported or printed.
+              </p>
+              <div className="mt-6">
+                <CharacterSheet />
+              </div>
+            </div>
           </div>
         ),
         getStatus: () => ({ complete: true })
