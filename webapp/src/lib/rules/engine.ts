@@ -494,6 +494,15 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
     history
   }
 
+  if (pendingDecisions.length > 0) {
+    const examples = pendingDecisions
+      .slice(0, 3)
+      .map((decision) => decision.label ?? decision.id.replace(/[-_]/g, ' '))
+    const exampleText = examples.length > 0 ? ` (e.g., ${examples.join(', ')})` : ''
+    const summary = pendingDecisions.length === 1 ? 'pending decision' : `${pendingDecisions.length} pending decisions`
+    warnings.push(`Resolve ${summary} before exporting${exampleText}.`)
+  }
+
   return {
     character,
     pendingDecisions,
