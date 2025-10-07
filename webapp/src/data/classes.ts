@@ -5,10 +5,18 @@ export interface ClassFeature {
   feature: FeatureInstance
 }
 
+export interface SubclassDefinition {
+  id: string
+  name: string
+  description?: string
+  source?: string
+  spellcastingAbility?: Ability
+}
+
 export interface ClassDefinition {
   id: string
   name: string
-  primaryAbility: Ability
+  primaryAbility: Ability | Ability[]
   hitDie: number
   savingThrows: Ability[]
   skillChoices: {
@@ -18,6 +26,10 @@ export interface ClassDefinition {
   armorProficiencies: string[]
   weaponProficiencies: string[]
   toolProficiencies: string[]
+  otherProficiencies?: string[]
+  spellcastingAbility?: Ability
+  subclasses?: SubclassDefinition[]
+  subclassLevel?: number
   featuresByLevel: Record<number, FeatureInstance[]>
   asiLevels: number[]
 }
@@ -198,6 +210,26 @@ export const classes: ClassDefinition[] = [
     armorProficiencies: ['All armor', 'Shields'],
     weaponProficiencies: ['Simple weapons', 'Martial weapons'],
     toolProficiencies: [],
+    otherProficiencies: ['Vehicles (land)'],
+    subclasses: [
+      {
+        id: 'fighter-champion',
+        name: 'Champion',
+        description: 'Focus on raw physical power to deliver critical strikes and athletic prowess.'
+      },
+      {
+        id: 'fighter-battle-master',
+        name: 'Battle Master',
+        description: 'Command the battlefield with tactical superiority and specialized maneuvers.'
+      },
+      {
+        id: 'fighter-eldritch-knight',
+        name: 'Eldritch Knight',
+        description: 'Blend martial training with arcane study to enhance combat versatility.',
+        spellcastingAbility: 'INT'
+      }
+    ],
+    subclassLevel: 3,
     featuresByLevel: fighterFeatures,
     asiLevels: [4, 6, 8, 12, 14, 16, 19]
   },
@@ -214,6 +246,26 @@ export const classes: ClassDefinition[] = [
     armorProficiencies: ['Light armor'],
     weaponProficiencies: ['Simple weapons', 'Hand crossbows', 'Longswords', 'Rapiers', 'Shortswords'],
     toolProficiencies: ["Thieves' tools"],
+    otherProficiencies: ["Thieves' cant"],
+    subclasses: [
+      {
+        id: 'rogue-thief',
+        name: 'Thief',
+        description: 'Specialize in agility, infiltration, and quick hands.'
+      },
+      {
+        id: 'rogue-assassin',
+        name: 'Assassin',
+        description: 'Excel at striking from the shadows with lethal precision.'
+      },
+      {
+        id: 'rogue-arcane-trickster',
+        name: 'Arcane Trickster',
+        description: 'Use illusion and enchantment magic to augment trickery.',
+        spellcastingAbility: 'INT'
+      }
+    ],
+    subclassLevel: 3,
     featuresByLevel: rogueFeatures,
     asiLevels: [4, 8, 10, 12, 16, 19]
   }

@@ -52,7 +52,7 @@ export interface FeatureInstance {
 
 export interface Decision {
   id: string
-  type: 'choose-skill' | 'choose-feat' | 'asi' | 'choose-tool' | 'choose-language'
+  type: 'choose-skill' | 'choose-feat' | 'asi' | 'choose-tool' | 'choose-language' | 'choose-subclass'
   options: any[]
   min: number
   max: number
@@ -90,7 +90,7 @@ export interface Character {
   saves: { proficient: Ability[] }
   skills: { proficient: Skill[] }
   languages: string[]
-  proficiencies: { armor: string[]; weapons: string[]; tools: string[] }
+  proficiencies: { armor: string[]; weapons: string[]; tools: string[]; other?: string[] }
   features: FeatureInstance[]
   decisions: Decision[]
   history: LevelSnapshot[]
