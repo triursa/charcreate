@@ -1,5 +1,7 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
+
+import SiteNav from './(components)/SiteNav'
 import { Providers } from './providers'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -18,7 +20,10 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <Providers>
-          {children}
+          <SiteNav />
+          <div className="pt-16">
+            {children}
+          </div>
         </Providers>
       </body>
     </html>
