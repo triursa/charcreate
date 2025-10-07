@@ -1,5 +1,5 @@
 "use client"
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 function DataTable({ rows, columns, onRowClick }: { rows: any[], columns: string[], onRowClick: (row: any) => void }) {
   return (
@@ -35,6 +35,97 @@ function formatDamageTags(text: string) {
   return text.replace(/\{@damage ([^}]+)}/g, (_, dmg) => `<b>${dmg}</b>`)
 }
 
+function renderSpellEntries(entry: any, keyPrefix = 'entry'): ReactNode[] {
+  if (entry == null) return []
+
+  if (typeof entry === 'string') {
+    return [
+      <p key={keyPrefix} dangerouslySetInnerHTML={{ __html: formatDamageTags(entry) }} />
+    ]
+  }
+
+  if (Array.isArray(entry)) {
+    return entry.flatMap((subEntry, idx) => renderSpellEntries(subEntry, `${keyPrefix}-${idx}`))
+  }
+
+  if (typeof entry === 'object') {
+    if (Array.isArray(entry.entries)) {
+      const nested = renderSpellEntries(entry.entries, `${keyPrefix}-entries`)
+
+      return [
+        <div key={keyPrefix} className="space-y-2">
+          {entry.name && <h3 className="font-semibold text-slate-800">{entry.name}</h3>}
+          {nested}
+        </div>
+      ]
+    }
+
+    if (entry.type === 'list' && Array.isArray(entry.items)) {
+      return [
+        <ul key={keyPrefix} className="ml-5 list-disc space-y-1">
+          {entry.items.map((item: any, idx: number) => (
+            <li key={`${keyPrefix}-item-${idx}`} className="space-y-1">
+              {renderSpellEntries(item, `${keyPrefix}-item-${idx}`)}
+            </li>
+          ))}
+        </ul>
+      ]
+    }
+
+    if (entry.type === 'table' && Array.isArray(entry.rows)) {
+      const columnLabels = Array.isArray(entry.colLabels) ? entry.colLabels : undefined
+      const caption = typeof entry.caption === 'string' ? entry.caption : undefined
+
+      const rows = entry.rows.map((row: any, rowIdx: number) => {
+        const cells = Array.isArray(row)
+          ? row
+          : Array.isArray(row?.cells)
+            ? row.cells
+            : Array.isArray(row?.entries)
+              ? row.entries
+              : [row]
+
+        return (
+          <tr key={`${keyPrefix}-row-${rowIdx}`} className="border-t">
+            {cells.map((cell: any, cellIdx: number) => (
+              <td key={`${keyPrefix}-row-${rowIdx}-cell-${cellIdx}`} className="px-2 py-1 align-top">
+                {renderSpellEntries(cell, `${keyPrefix}-row-${rowIdx}-cell-${cellIdx}`)}
+              </td>
+            ))}
+          </tr>
+        )
+      })
+
+      return [
+        <table key={keyPrefix} className="my-3 w-full border border-slate-200 text-sm">
+          {caption && <caption className="pb-2 font-semibold text-slate-800">{caption}</caption>}
+          {columnLabels && (
+            <thead className="bg-slate-50 text-left">
+              <tr>
+                {columnLabels.map((label: string, idx: number) => (
+                  <th key={`${keyPrefix}-header-${idx}`} className="px-2 py-1 font-semibold text-slate-700">
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+          )}
+          <tbody>{rows}</tbody>
+        </table>
+      ]
+    }
+
+    // Fallback: stringify unknown structures to avoid runtime errors.
+    return [
+      <pre key={keyPrefix} className="overflow-x-auto rounded bg-slate-100 p-2 text-xs text-slate-700">
+        {JSON.stringify(entry, null, 2)}
+      </pre>
+    ]
+  }
+
+  return []
+}
+
 function formatSpell(entry: any) {
   // Components
   let components = []
@@ -60,11 +151,7 @@ function formatSpell(entry: any) {
     ? entry.duration.map((d: any) => d.type.charAt(0).toUpperCase() + d.type.slice(1)).join(', ')
     : ''
   // Entries
-  let entries = Array.isArray(entry.entries)
-    ? entry.entries.map((e: string, i: number) => (
-        <p key={i} dangerouslySetInnerHTML={{ __html: formatDamageTags(e) }} />
-      ))
-    : null
+  const entries = renderSpellEntries(entry.entries)
 
   return (
     <div>
@@ -111,3 +198,5 @@ export default function ClientTable({ rows, columns }: { rows: any[], columns: s
     {modal && <EntryModal entry={modal} onClose={() => setModal(null)} />}
   </>
 }
+
+export { formatDamageTags, renderSpellEntries }
