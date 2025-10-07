@@ -148,14 +148,110 @@ function applyFeatEffects(
 }
 
 export function buildCharacter(state: CharacterBuilderState): BuildResult {
-  const ancestry = state.ancestryId ? ancestryMap[state.ancestryId] : undefined
+  // Use ancestryData from state if present, else fallback to ancestryMap
+  const ancestry = state.ancestryData ?? (state.ancestryId ? ancestryMap[state.ancestryId] : undefined)
+  const background = state.backgroundData
   const cls = state.classId ? classMap[state.classId] : undefined
 
   const racialBonuses = emptyAbilityRecord()
   if (ancestry) {
-    for (const [ability, bonus] of Object.entries(ancestry.abilityBonuses)) {
-      const key = ability as Ability
-      racialBonuses[key] = (racialBonuses[key] ?? 0) + (bonus ?? 0)
+    // Support both static and DB race formats
+    let abilityBonuses: Record<string, number> = {}
+    if (Array.isArray(ancestry.ability)) {
+      ancestry.ability.forEach((obj: any) => {
+        Object.entries(obj).forEach(([ability, value]) => {
+          if (ability !== 'choose' && typeof value === 'number') {
+            abilityBonuses[ability] = value
+          }
+        })
+      })
+    } else if (typeof ancestry.ability === 'object' && ancestry.ability !== null) {
+      Object.entries(ancestry.ability).forEach(([ability, value]) => {
+        if (typeof value === 'number') abilityBonuses[ability] = value
+      })
+    } else if (typeof ancestry.abilityBonuses === 'object' && ancestry.abilityBonuses !== null) {
+      Object.entries(ancestry.abilityBonuses).forEach(([ability, value]) => {
+        if (typeof value === 'number') abilityBonuses[ability] = value
+      })
+    }
+    for (const [ability, bonus] of Object.entries(abilityBonuses)) {
+      const key = ability.toUpperCase() as Ability
+      racialBonuses[key] = (racialBonuses[key] ?? 0) + (typeof bonus === 'number' ? bonus : 0)
+    }
+  }
+
+  // Apply background bonuses and features
+  if (background) {
+    // Skills
+    if (Array.isArray(background.skillProficiencies)) {
+      background.skillProficiencies.forEach((skill: any) => {
+        if (typeof skill === 'string') skillProficiencies.add(skill)
+      })
+    }
+    // Tools
+    if (Array.isArray(background.toolProficiencies)) {
+      background.toolProficiencies.forEach((tool: any) => {
+        if (typeof tool === 'string') toolProficiencies.add(tool)
+      })
+    }
+    // Languages
+    if (Array.isArray(background.languages)) {
+      background.languages.forEach((lang: any) => {
+        if (typeof lang === 'string') languages.add(lang)
+      })
+    }
+    // Feature
+    if (background.feature) {
+      if (Array.isArray(background.feature)) {
+        background.feature.forEach((feature: any) => {
+          if (feature && feature.id) features.push({ ...feature, source: Array.isArray(feature.source) ? [...feature.source] : [] })
+        })
+      } else if (background.feature && background.feature.id) {
+        features.push({ ...background.feature, source: Array.isArray(background.feature.source) ? [...background.feature.source] : [] })
+      }
+    }
+    // Decision queue for skills/languages/tools
+    if (background.skillProficiencies && Array.isArray(background.skillProficiencies)) {
+      background.skillProficiencies.forEach((skill: any) => {
+        if (skill.choose && Array.isArray(skill.choose.from)) {
+          pendingDecisions.push({
+            id: `background-skill-${background.id}`,
+            type: 'choose-skill',
+            options: skill.choose.from,
+            min: skill.choose.count ?? 1,
+            max: skill.choose.count ?? 1,
+            label: `Choose ${skill.choose.count ?? 1} background skill(s)`
+          })
+        }
+      })
+    }
+    if (background.languageProficiencies && Array.isArray(background.languageProficiencies)) {
+      background.languageProficiencies.forEach((lang: any) => {
+        if (lang.choose && Array.isArray(lang.choose.from)) {
+          pendingDecisions.push({
+            id: `background-language-${background.id}`,
+            type: 'choose-language',
+            options: lang.choose.from,
+            min: lang.choose.count ?? 1,
+            max: lang.choose.count ?? 1,
+            label: `Choose ${lang.choose.count ?? 1} background language(s)`
+          })
+        }
+      })
+    }
+    if (background.toolProficiencies && Array.isArray(background.toolProficiencies)) {
+      background.toolProficiencies.forEach((tool: any) => {
+        if (tool.choose && Array.isArray(tool.choose.from)) {
+          pendingDecisions.push({
+            id: `background-tool-${background.id}`,
+            type: 'choose-tool',
+            options: tool.choose.from,
+            min: tool.choose.count ?? 1,
+            max: tool.choose.count ?? 1,
+            label: `Choose ${tool.choose.count ?? 1} background tool(s)`
+          })
+        }
+      })
     }
   }
 
@@ -176,20 +272,43 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
   const history: LevelSnapshot[] = []
 
   if (ancestry) {
-    ancestry.languages.forEach((language) => languages.add(language))
-    ancestry.features.forEach((feature) => {
-      features.push({ ...feature, source: [...feature.source] })
-    })
-    ancestry.skillProficiencies?.forEach((skill) => skillProficiencies.add(skill))
+    // Languages
+    if (Array.isArray(ancestry.languages)) {
+      ancestry.languages.forEach((language: any) => {
+        if (typeof language === 'string') languages.add(language)
+      })
+    } else if (Array.isArray(ancestry.languageProficiencies)) {
+      ancestry.languageProficiencies.forEach((language: any) => {
+        if (typeof language === 'string') languages.add(language)
+      })
+    }
+    // Features
+    if (Array.isArray(ancestry.features)) {
+      ancestry.features.forEach((feature: any) => {
+        if (feature && feature.id) features.push({ ...feature, source: Array.isArray(feature.source) ? [...feature.source] : [] })
+      })
+    }
+    // Skill Proficiencies
+    if (Array.isArray(ancestry.skillProficiencies)) {
+      ancestry.skillProficiencies.forEach((skill: any) => {
+        if (typeof skill === 'string') skillProficiencies.add(skill)
+      })
+    }
   }
 
   let hp = 0
   let totalLevelsProcessed = 0
 
   if (cls && state.level > 0) {
-    armorProficiencies.add(...cls.armorProficiencies)
-    weaponProficiencies.add(...cls.weaponProficiencies)
-    toolProficiencies.add(...cls.toolProficiencies)
+    if (Array.isArray(cls.armorProficiencies)) {
+      cls.armorProficiencies.forEach((prof: any) => armorProficiencies.add(prof))
+    }
+    if (Array.isArray(cls.weaponProficiencies)) {
+      cls.weaponProficiencies.forEach((prof: any) => weaponProficiencies.add(prof))
+    }
+    if (Array.isArray(cls.toolProficiencies)) {
+      cls.toolProficiencies.forEach((prof: any) => toolProficiencies.add(prof))
+    }
   }
 
   for (let level = 1; level <= state.level; level += 1) {

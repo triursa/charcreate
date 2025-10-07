@@ -37,6 +37,9 @@ export interface CharacterBuilderState {
   abilityMethod: AbilityMethod
   baseAbilities: Record<Ability, number>
   ancestryId?: string
+  ancestryData?: any // Store full race object
+  backgroundId?: string
+  backgroundData?: any // Store full background object
   classId?: string
   level: number
   resolvedDecisions: Record<string, ResolvedDecisionValue>
@@ -75,7 +78,8 @@ type Action =
   | { type: 'SET_ABILITY_METHOD'; payload: AbilityMethod }
   | { type: 'SET_BASE_ABILITY'; ability: Ability; value: number }
   | { type: 'APPLY_BOSS_ARRAY' }
-  | { type: 'SET_ANCESTRY'; payload: string | undefined }
+  | { type: 'SET_ANCESTRY'; payload: string | undefined | any }
+  | { type: 'SET_BACKGROUND'; payload: string | undefined | any }
   | { type: 'SET_CLASS'; payload: string | undefined }
   | { type: 'SET_LEVEL'; payload: number }
   | { type: 'RESOLVE_DECISION'; id: string; value: ResolvedDecisionValue }
@@ -83,6 +87,21 @@ type Action =
 
 function reducer(state: CharacterBuilderState, action: Action): CharacterBuilderState {
   switch (action.type) {
+    case 'SET_BACKGROUND': {
+      if (typeof action.payload === 'object' && action.payload !== null) {
+        return {
+          ...state,
+          backgroundId: action.payload.id,
+          backgroundData: action.payload
+        }
+      } else {
+        return {
+          ...state,
+          backgroundId: action.payload,
+          backgroundData: undefined
+        }
+      }
+    }
     case 'SET_BASICS':
       return {
         ...state,
@@ -116,11 +135,22 @@ function reducer(state: CharacterBuilderState, action: Action): CharacterBuilder
         abilityMethod: 'boss-array'
       }
     }
-    case 'SET_ANCESTRY':
-      return {
-        ...state,
-        ancestryId: action.payload
+    case 'SET_ANCESTRY': {
+      // action.payload can be a race object or id
+      if (typeof action.payload === 'object' && action.payload !== null) {
+        return {
+          ...state,
+          ancestryId: action.payload.id,
+          ancestryData: action.payload
+        }
+      } else {
+        return {
+          ...state,
+          ancestryId: action.payload,
+          ancestryData: undefined
+        }
       }
+    }
     case 'SET_CLASS':
       return {
         ...state,
@@ -163,7 +193,8 @@ interface CharacterBuilderContextValue {
     setAbilityMethod: (method: AbilityMethod) => void
     setBaseAbility: (ability: Ability, value: number) => void
     applyBossArray: () => void
-    setAncestry: (id: string | undefined) => void
+    setAncestry: (id: string | undefined | any) => void
+    setBackground: (id: string | undefined | any) => void
     setClass: (id: string | undefined) => void
     setLevel: (level: number) => void
     resolveDecision: (id: string, value: ResolvedDecisionValue) => void
@@ -185,7 +216,8 @@ export function CharacterBuilderProvider({ children }: { children: React.ReactNo
       setBaseAbility: (ability: Ability, value: number) =>
         dispatch({ type: 'SET_BASE_ABILITY', ability, value }),
       applyBossArray: () => dispatch({ type: 'APPLY_BOSS_ARRAY' }),
-      setAncestry: (id: string | undefined) => dispatch({ type: 'SET_ANCESTRY', payload: id }),
+      setAncestry: (id: string | undefined | any) => dispatch({ type: 'SET_ANCESTRY', payload: id }),
+      setBackground: (id: string | undefined | any) => dispatch({ type: 'SET_BACKGROUND', payload: id }),
       setClass: (id: string | undefined) => dispatch({ type: 'SET_CLASS', payload: id }),
       setLevel: (level: number) => dispatch({ type: 'SET_LEVEL', payload: level }),
       resolveDecision: (id: string, value: ResolvedDecisionValue) =>
