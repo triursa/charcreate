@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { buildAdminRedirectUrl, describePrismaError, getPrismaClient, loadSpellDuplicates, parseIdParam } from '../helpers'
+import { prisma } from '@/lib/prisma'
+import { buildAdminRedirectUrl, describePrismaError, loadSpellDuplicates, parseIdParam } from '../helpers'
 
 export async function POST(request: NextRequest) {
   const baseUrl = new URL(request.url)
@@ -18,8 +19,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const prisma = getPrismaClient()
-    const duplicates = await loadSpellDuplicates(prisma)
+    const duplicates = await loadSpellDuplicates()
     const match = duplicates.find(([name]) => name === rawName)
 
     if (!match) {

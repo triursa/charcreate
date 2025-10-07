@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { buildAdminRedirectUrl, describePrismaError, getPrismaClient, parseIdParam } from '../helpers'
+import { prisma } from '@/lib/prisma'
+import { buildAdminRedirectUrl, describePrismaError, parseIdParam } from '../helpers'
 
 export async function POST(request: NextRequest) {
   const baseUrl = new URL(request.url)
@@ -11,7 +12,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const prisma = getPrismaClient()
     await prisma.spell.delete({ where: { id: idParam.id } })
 
     const url = buildAdminRedirectUrl(baseUrl, 'success', `Deleted entry ${idParam.id}.`)

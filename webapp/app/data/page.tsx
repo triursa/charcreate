@@ -1,10 +1,9 @@
 
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 const ClientTable = dynamic(() => import('./ClientTable'), { ssr: false })
 
-const prisma = new PrismaClient()
 const PAGE_SIZE = 20
 const MODELS = [
   { key: 'spell', label: 'Spells' },
