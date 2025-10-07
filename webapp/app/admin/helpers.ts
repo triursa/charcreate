@@ -1,18 +1,10 @@
 import { Prisma, PrismaClient, Spell } from '@prisma/client'
-
-let prismaClient: PrismaClient | null = null
-
-export function getPrismaClient() {
-  if (!prismaClient) {
-    prismaClient = new PrismaClient()
-  }
-  return prismaClient
-}
+import { prisma } from '@/lib/prisma'
 
 export type DuplicateGroup = [string, Spell[]]
 
-export async function loadSpellDuplicates(prisma = getPrismaClient()): Promise<DuplicateGroup[]> {
-  const allEntries = await prisma.spell.findMany()
+export async function loadSpellDuplicates(client: PrismaClient = prisma): Promise<DuplicateGroup[]> {
+  const allEntries = await client.spell.findMany()
   const grouped: Record<string, Spell[]> = {}
 
   for (const entry of allEntries) {
