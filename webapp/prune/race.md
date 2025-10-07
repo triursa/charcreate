@@ -13,7 +13,6 @@ Stores playable race data, including traits, abilities, and source info.
 - `traitTags`: Tags for traits. Example: `[ "Darkvision" ]`
 - `languageProficiencies`: Languages known (JSON). Example: `[ "Common", "Elvish" ]`
 - `entries`: Descriptive text (JSON). Example: `[ "Elves are a magical people..." ]`
-- `otherSources`, `reprintedAs`, `copy`, etc.: Metadata and source info.
 
 ---
 Races may have many optional fields for traits, resistances, and proficiencies.
