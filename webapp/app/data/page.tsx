@@ -82,7 +82,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
           <h1 className="text-2xl font-semibold">Data Browser</h1>
           <p className="text-sm text-slate-600">Browse and search all datasets.</p>
         </div>
-        <Link href="/" className="text-sm text-blue-600 hover:underline">Back to Planner</Link>
+        <Link href="/charcreate" className="text-sm text-blue-600 hover:underline">Back to Planner</Link>
       </div>
 
       <div className="mb-6 flex gap-2 border-b">
