@@ -1,0 +1,218 @@
+'use client'
+
+import { createContext, useContext, useMemo, useReducer } from 'react'
+
+import { abilityList } from '@/lib/abilities'
+import { buildCharacter } from '@/lib/rules/engine'
+import type { Character, Decision } from '@/types/character'
+import type { Ability, Skill } from '@/types/character'
+
+export type AbilityMethod = 'boss-array' | 'manual'
+
+export interface BasicsState {
+  name: string
+  descriptor?: string
+  campaignNotes?: string
+  alignment?: string
+  occupation?: string
+  origin?: string
+  affiliations: string[]
+  raceDetail?: string
+  gender?: string
+  age?: number
+}
+
+export type ResolvedDecisionValue =
+  | { type: 'choose-skill'; choices: Skill[] }
+  | { type: 'choose-language'; choices: string[] }
+  | { type: 'choose-tool'; choices: string[] }
+  | { type: 'choose-feat'; featId: string }
+  | { type: 'asi'; mode: 'ability'; abilities: Ability[] }
+  | { type: 'asi'; mode: 'feat'; featId: string; abilitySelection?: Ability }
+  | { type: 'custom'; data: unknown }
+
+export interface CharacterBuilderState {
+  id: string
+  basics: BasicsState
+  abilityMethod: AbilityMethod
+  baseAbilities: Record<Ability, number>
+  ancestryId?: string
+  classId?: string
+  level: number
+  resolvedDecisions: Record<string, ResolvedDecisionValue>
+}
+
+const defaultBaseAbilities: Record<Ability, number> = {
+  STR: 10,
+  DEX: 10,
+  CON: 10,
+  INT: 10,
+  WIS: 10,
+  CHA: 10
+}
+
+const initialState: CharacterBuilderState = {
+  id: 'charplanner-1',
+  basics: {
+    name: 'New Character',
+    descriptor: '',
+    campaignNotes: '',
+    alignment: '',
+    occupation: '',
+    origin: '',
+    affiliations: []
+  },
+  abilityMethod: 'manual',
+  baseAbilities: { ...defaultBaseAbilities },
+  ancestryId: undefined,
+  classId: 'fighter',
+  level: 1,
+  resolvedDecisions: {}
+}
+
+type Action =
+  | { type: 'SET_BASICS'; payload: Partial<BasicsState> }
+  | { type: 'SET_ABILITY_METHOD'; payload: AbilityMethod }
+  | { type: 'SET_BASE_ABILITY'; ability: Ability; value: number }
+  | { type: 'APPLY_BOSS_ARRAY' }
+  | { type: 'SET_ANCESTRY'; payload: string | undefined }
+  | { type: 'SET_CLASS'; payload: string | undefined }
+  | { type: 'SET_LEVEL'; payload: number }
+  | { type: 'RESOLVE_DECISION'; id: string; value: ResolvedDecisionValue }
+  | { type: 'CLEAR_DECISION'; id: string }
+
+function reducer(state: CharacterBuilderState, action: Action): CharacterBuilderState {
+  switch (action.type) {
+    case 'SET_BASICS':
+      return {
+        ...state,
+        basics: {
+          ...state.basics,
+          ...action.payload
+        }
+      }
+    case 'SET_ABILITY_METHOD':
+      return {
+        ...state,
+        abilityMethod: action.payload
+      }
+    case 'SET_BASE_ABILITY':
+      return {
+        ...state,
+        baseAbilities: {
+          ...state.baseAbilities,
+          [action.ability]: action.value
+        }
+      }
+    case 'APPLY_BOSS_ARRAY': {
+      const bossArray = [17, 15, 13, 13, 11, 9]
+      const updated: Record<Ability, number> = { ...state.baseAbilities }
+      abilityList.forEach((ability, index) => {
+        updated[ability] = bossArray[index] ?? updated[ability]
+      })
+      return {
+        ...state,
+        baseAbilities: updated,
+        abilityMethod: 'boss-array'
+      }
+    }
+    case 'SET_ANCESTRY':
+      return {
+        ...state,
+        ancestryId: action.payload
+      }
+    case 'SET_CLASS':
+      return {
+        ...state,
+        classId: action.payload ?? state.classId,
+        resolvedDecisions: {}
+      }
+    case 'SET_LEVEL':
+      return {
+        ...state,
+        level: Math.max(0, Math.min(20, action.payload))
+      }
+    case 'RESOLVE_DECISION':
+      return {
+        ...state,
+        resolvedDecisions: {
+          ...state.resolvedDecisions,
+          [action.id]: action.value
+        }
+      }
+    case 'CLEAR_DECISION': {
+      const updated = { ...state.resolvedDecisions }
+      delete updated[action.id]
+      return {
+        ...state,
+        resolvedDecisions: updated
+      }
+    }
+    default:
+      return state
+  }
+}
+
+interface CharacterBuilderContextValue {
+  state: CharacterBuilderState
+  character: Character
+  pendingDecisions: Decision[]
+  warnings: string[]
+  actions: {
+    setBasics: (payload: Partial<BasicsState>) => void
+    setAbilityMethod: (method: AbilityMethod) => void
+    setBaseAbility: (ability: Ability, value: number) => void
+    applyBossArray: () => void
+    setAncestry: (id: string | undefined) => void
+    setClass: (id: string | undefined) => void
+    setLevel: (level: number) => void
+    resolveDecision: (id: string, value: ResolvedDecisionValue) => void
+    clearDecision: (id: string) => void
+  }
+}
+
+const CharacterBuilderContext = createContext<CharacterBuilderContextValue | undefined>(undefined)
+
+export function CharacterBuilderProvider({ children }: { children: React.ReactNode }) {
+  const [state, dispatch] = useReducer(reducer, initialState)
+
+  const buildResult = useMemo(() => buildCharacter(state), [state])
+
+  const actions = useMemo(
+    () => ({
+      setBasics: (payload: Partial<BasicsState>) => dispatch({ type: 'SET_BASICS', payload }),
+      setAbilityMethod: (method: AbilityMethod) => dispatch({ type: 'SET_ABILITY_METHOD', payload: method }),
+      setBaseAbility: (ability: Ability, value: number) =>
+        dispatch({ type: 'SET_BASE_ABILITY', ability, value }),
+      applyBossArray: () => dispatch({ type: 'APPLY_BOSS_ARRAY' }),
+      setAncestry: (id: string | undefined) => dispatch({ type: 'SET_ANCESTRY', payload: id }),
+      setClass: (id: string | undefined) => dispatch({ type: 'SET_CLASS', payload: id }),
+      setLevel: (level: number) => dispatch({ type: 'SET_LEVEL', payload: level }),
+      resolveDecision: (id: string, value: ResolvedDecisionValue) =>
+        dispatch({ type: 'RESOLVE_DECISION', id, value }),
+      clearDecision: (id: string) => dispatch({ type: 'CLEAR_DECISION', id })
+    }),
+    []
+  )
+
+  const value = useMemo(
+    () => ({
+      state,
+      character: buildResult.character,
+      pendingDecisions: buildResult.pendingDecisions,
+      warnings: buildResult.warnings,
+      actions
+    }),
+    [actions, buildResult, state]
+  )
+
+  return <CharacterBuilderContext.Provider value={value}>{children}</CharacterBuilderContext.Provider>
+}
+
+export function useCharacterBuilder() {
+  const context = useContext(CharacterBuilderContext)
+  if (!context) {
+    throw new Error('useCharacterBuilder must be used within a CharacterBuilderProvider')
+  }
+  return context
+}

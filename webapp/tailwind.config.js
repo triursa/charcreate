@@ -1,9 +1,10 @@
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+const config = {
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/**/*.{js,ts,jsx,tsx,mdx}'
   ],
   darkMode: 'class',
   theme: {
@@ -19,7 +20,7 @@ module.exports = {
           600: '#dc2626',
           700: '#b91c1c',
           800: '#991b1b',
-          900: '#7f1d1d',
+          900: '#7f1d1d'
         },
         dark: {
           50: '#f8fafc',
@@ -31,14 +32,16 @@ module.exports = {
           600: '#475569',
           700: '#334155',
           800: '#1e293b',
-          900: '#0f172a',
+          900: '#0f172a'
         }
       },
       fontFamily: {
-        'serif': ['Cinzel', 'serif'],
-        'fantasy': ['Cinzel Decorative', 'fantasy'],
+        serif: ['Cinzel', 'serif'],
+        fantasy: ['Cinzel Decorative', 'fantasy']
       }
-    },
+    }
   },
-  plugins: [],
+  plugins: []
 }
+
+export default config
