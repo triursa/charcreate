@@ -2,8 +2,7 @@
 
 import { OverviewCard } from '@/components/character/OverviewCard'
 import { AbilityGrid } from '@/components/character/AbilityGrid'
-import { AncestrySelector } from '@/components/character/AncestrySelector'
-import { BackgroundSelector } from '@/components/character/BackgroundSelector'
+import { CharacterOptionsTabbed } from '@/components/character/CharacterOptionsTabbed'
 import { ClassLeveler } from '@/components/character/ClassLeveler'
 import { StatsPanel } from '@/components/character/StatsPanel'
 import { SkillsTable } from '@/components/character/SkillsTable'
@@ -44,8 +43,7 @@ export function CharacterLayout() {
         <div className="space-y-6 lg:col-span-2">
           <OverviewCard />
           <AbilityGrid />
-          <AncestrySelector />
-          <BackgroundSelector />
+          <CharacterOptionsTabbed />
           <ClassLeveler />
           <LevelTimeline />
         </div>

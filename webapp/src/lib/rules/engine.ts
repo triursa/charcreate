@@ -180,12 +180,55 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
     }
   }
 
+  const asiBonuses = emptyAbilityRecord()
+  const totalAbilities: Record<Ability, number> = { ...state.baseAbilities }
+  for (const ability of abilityList) {
+    totalAbilities[ability] = (totalAbilities[ability] ?? 0) + racialBonuses[ability]
+  }
+
+  const features: FeatureInstance[] = []
+  const languages = new Set<string>()
+  const skillProficiencies = new Set<Skill>()
+  const armorProficiencies = new Set<string>()
+  const weaponProficiencies = new Set<string>()
+  const toolProficiencies = new Set<string>()
+  const pendingDecisions: Decision[] = []
+  const warnings: string[] = []
+  const history: LevelSnapshot[] = []
+
+  if (ancestry) {
+    // Languages
+    if (Array.isArray(ancestry.languages)) {
+      ancestry.languages.forEach((language: any) => {
+        if (typeof language === 'string') languages.add(language)
+      })
+    } else if (Array.isArray(ancestry.languageProficiencies)) {
+      ancestry.languageProficiencies.forEach((language: any) => {
+        if (typeof language === 'string') languages.add(language)
+      })
+    }
+    // Features
+    if (Array.isArray(ancestry.features)) {
+      ancestry.features.forEach((feature: any) => {
+        if (feature && feature.id) features.push({ ...feature, source: Array.isArray(feature.source) ? [...feature.source] : [] })
+      })
+    }
+    // Skill Proficiencies
+    if (Array.isArray(ancestry.skillProficiencies)) {
+      ancestry.skillProficiencies.forEach((skill: any) => {
+        if (typeof skill === 'string') skillProficiencies.add(skill as any)
+      })
+    }
+  }
+
   // Apply background bonuses and features
   if (background) {
     // Skills
     if (Array.isArray(background.skillProficiencies)) {
       background.skillProficiencies.forEach((skill: any) => {
-        if (typeof skill === 'string') skillProficiencies.add(skill)
+        if (typeof skill === 'string') {
+          skillProficiencies.add(skill as any) // TODO: Fix typing
+        }
       })
     }
     // Tools
@@ -225,8 +268,8 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
         }
       })
     }
-    if (background.languageProficiencies && Array.isArray(background.languageProficiencies)) {
-      background.languageProficiencies.forEach((lang: any) => {
+    if (background.languages && Array.isArray(background.languages)) {
+      background.languages.forEach((lang: any) => {
         if (lang.choose && Array.isArray(lang.choose.from)) {
           pendingDecisions.push({
             id: `background-language-${background.id}`,
@@ -251,47 +294,6 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
             label: `Choose ${tool.choose.count ?? 1} background tool(s)`
           })
         }
-      })
-    }
-  }
-
-  const asiBonuses = emptyAbilityRecord()
-  const totalAbilities: Record<Ability, number> = { ...state.baseAbilities }
-  for (const ability of abilityList) {
-    totalAbilities[ability] = (totalAbilities[ability] ?? 0) + racialBonuses[ability]
-  }
-
-  const features: FeatureInstance[] = []
-  const languages = new Set<string>()
-  const skillProficiencies = new Set<Skill>()
-  const armorProficiencies = new Set<string>()
-  const weaponProficiencies = new Set<string>()
-  const toolProficiencies = new Set<string>()
-  const pendingDecisions: Decision[] = []
-  const warnings: string[] = []
-  const history: LevelSnapshot[] = []
-
-  if (ancestry) {
-    // Languages
-    if (Array.isArray(ancestry.languages)) {
-      ancestry.languages.forEach((language: any) => {
-        if (typeof language === 'string') languages.add(language)
-      })
-    } else if (Array.isArray(ancestry.languageProficiencies)) {
-      ancestry.languageProficiencies.forEach((language: any) => {
-        if (typeof language === 'string') languages.add(language)
-      })
-    }
-    // Features
-    if (Array.isArray(ancestry.features)) {
-      ancestry.features.forEach((feature: any) => {
-        if (feature && feature.id) features.push({ ...feature, source: Array.isArray(feature.source) ? [...feature.source] : [] })
-      })
-    }
-    // Skill Proficiencies
-    if (Array.isArray(ancestry.skillProficiencies)) {
-      ancestry.skillProficiencies.forEach((skill: any) => {
-        if (typeof skill === 'string') skillProficiencies.add(skill)
       })
     }
   }

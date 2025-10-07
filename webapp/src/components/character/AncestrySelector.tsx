@@ -40,22 +40,13 @@ export function AncestrySelector() {
   }, [])
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Ancestry &amp; Heritage</h2>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Apply lineage bonuses, innate abilities, and cultural proficiencies.
-          </p>
-        </div>
-      </div>
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        {loading ? (
-          <div>Loading races...</div>
-        ) : error ? (
-          <div className="text-red-500">Error: {error}</div>
-        ) : (
-          races.map((race) => (
+    <div className="grid gap-4 md:grid-cols-2">
+      {loading ? (
+        <div>Loading races...</div>
+      ) : error ? (
+        <div className="text-red-500">Error: {error}</div>
+      ) : (
+        races.map((race) => (
             <div
               key={race.id}
               className={`border rounded-lg p-4 cursor-pointer ${ancestryId === race.id ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950' : 'border-slate-300 bg-transparent dark:border-slate-600'}`}
@@ -189,7 +180,6 @@ export function AncestrySelector() {
             </div>
           ))
         )}
-      </div>
-    </section>
+    </div>
   )
 }
