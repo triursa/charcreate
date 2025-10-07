@@ -56,4 +56,4 @@ Thumbs.db
 data/*
 
 # Working Directory of Prisma headers
-prune/*
+webapp/prune/*

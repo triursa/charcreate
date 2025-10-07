@@ -37,12 +37,22 @@ export function OverviewCard() {
         </label>
         <label className="flex flex-col text-sm font-medium text-slate-700 dark:text-slate-300">
           Alignment
-          <input
+          <select
             value={basics.alignment ?? ''}
             onChange={(event) => actions.setBasics({ alignment: event.target.value })}
             className="mt-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-            placeholder="e.g. Chaotic Good"
-          />
+          >
+            <option value="">Select alignment...</option>
+            <option value="Lawful Good">Lawful Good</option>
+            <option value="Neutral Good">Neutral Good</option>
+            <option value="Chaotic Good">Chaotic Good</option>
+            <option value="Lawful Neutral">Lawful Neutral</option>
+            <option value="True Neutral">True Neutral</option>
+            <option value="Chaotic Neutral">Chaotic Neutral</option>
+            <option value="Lawful Evil">Lawful Evil</option>
+            <option value="Neutral Evil">Neutral Evil</option>
+            <option value="Chaotic Evil">Chaotic Evil</option>
+          </select>
         </label>
       </div>
 
