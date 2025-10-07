@@ -8,11 +8,6 @@ import type { Ability, Decision, Skill } from '@/types/character'
 import { useCharacterBuilder } from '@/state/character-builder'
 import type { ResolvedDecisionValue } from '@/state/character-builder'
 
-interface SkillDraft {
-  type: 'choose-skill'
-  skills: Skill[]
-}
-
 interface AsiDraft {
   type: 'asi'
   mode: 'ability' | 'feat'
@@ -21,7 +16,22 @@ interface AsiDraft {
   abilitySelection?: Ability | ''
 }
 
-type Draft = SkillDraft | AsiDraft
+interface SkillDraft {
+  type: 'choose-skill'
+  skills: Skill[]
+}
+
+interface LanguageDraft {
+  type: 'choose-language'
+  languages: string[]
+}
+
+interface ToolDraft {
+  type: 'choose-tool'
+  tools: string[]
+}
+
+type Draft = SkillDraft | AsiDraft | LanguageDraft | ToolDraft
 
 export function DecisionQueue() {
   const {
@@ -50,6 +60,30 @@ export function DecisionQueue() {
             next[decision.id] = { type: 'choose-skill', skills: [...resolved.choices] }
           } else {
             next[decision.id] = { type: 'choose-skill', skills: [] }
+          }
+        } else if (decision.type === 'choose-language') {
+          const existing = current[decision.id] as LanguageDraft | undefined
+          if (existing) {
+            next[decision.id] = existing
+            continue
+          }
+          const resolved = resolvedDecisions[decision.id] as ResolvedDecisionValue | undefined
+          if (resolved && resolved.type === 'choose-language') {
+            next[decision.id] = { type: 'choose-language', languages: [...resolved.choices] }
+          } else {
+            next[decision.id] = { type: 'choose-language', languages: [] }
+          }
+        } else if (decision.type === 'choose-tool') {
+          const existing = current[decision.id] as ToolDraft | undefined
+          if (existing) {
+            next[decision.id] = existing
+            continue
+          }
+          const resolved = resolvedDecisions[decision.id] as ResolvedDecisionValue | undefined
+          if (resolved && resolved.type === 'choose-tool') {
+            next[decision.id] = { type: 'choose-tool', tools: [...resolved.choices] }
+          } else {
+            next[decision.id] = { type: 'choose-tool', tools: [] }
           }
         } else if (decision.type === 'asi') {
           const existing = current[decision.id] as AsiDraft | undefined
@@ -93,7 +127,7 @@ export function DecisionQueue() {
     })
   }, [pendingDecisions])
 
-const handleSkillToggle = (decision: Decision, skill: string) => {
+  const handleSkillToggle = (decision: Decision, skill: string) => {
     setDrafts((current) => {
       const existing = (current[decision.id] as SkillDraft | undefined) ?? { type: 'choose-skill', skills: [] }
       const skills = new Set(existing.skills)
@@ -108,6 +142,44 @@ const handleSkillToggle = (decision: Decision, skill: string) => {
       return {
         ...current,
         [decision.id]: { type: 'choose-skill', skills: Array.from(skills) }
+      }
+    })
+  }
+
+  const handleLanguageToggle = (decision: Decision, language: string) => {
+    setDrafts((current) => {
+      const existing = (current[decision.id] as LanguageDraft | undefined) ?? { type: 'choose-language', languages: [] }
+      const languages = new Set(existing.languages)
+      if (languages.has(language)) {
+        languages.delete(language)
+      } else {
+        if (languages.size >= decision.max) {
+          return current
+        }
+        languages.add(language)
+      }
+      return {
+        ...current,
+        [decision.id]: { type: 'choose-language', languages: Array.from(languages) }
+      }
+    })
+  }
+
+  const handleToolToggle = (decision: Decision, tool: string) => {
+    setDrafts((current) => {
+      const existing = (current[decision.id] as ToolDraft | undefined) ?? { type: 'choose-tool', tools: [] }
+      const tools = new Set(existing.tools)
+      if (tools.has(tool)) {
+        tools.delete(tool)
+      } else {
+        if (tools.size >= decision.max) {
+          return current
+        }
+        tools.add(tool)
+      }
+      return {
+        ...current,
+        [decision.id]: { type: 'choose-tool', tools: Array.from(tools) }
       }
     })
   }
@@ -186,6 +258,34 @@ const handleSkillToggle = (decision: Decision, skill: string) => {
       return
     }
 
+    if (decision.type === 'choose-language' && draft.type === 'choose-language') {
+      if (draft.languages.length < decision.min || draft.languages.length > decision.max) {
+        const message =
+          decision.min === decision.max
+            ? `Pick exactly ${decision.max} languages.`
+            : `Pick between ${decision.min} and ${decision.max} languages.`
+        setErrors((current) => ({ ...current, [decision.id]: message }))
+        return
+      }
+      actions.resolveDecision(decision.id, { type: 'choose-language', choices: draft.languages })
+      setErrors((current) => ({ ...current, [decision.id]: undefined }))
+      return
+    }
+
+    if (decision.type === 'choose-tool' && draft.type === 'choose-tool') {
+      if (draft.tools.length < decision.min || draft.tools.length > decision.max) {
+        const message =
+          decision.min === decision.max
+            ? `Pick exactly ${decision.max} tools.`
+            : `Pick between ${decision.min} and ${decision.max} tools.`
+        setErrors((current) => ({ ...current, [decision.id]: message }))
+        return
+      }
+      actions.resolveDecision(decision.id, { type: 'choose-tool', choices: draft.tools })
+      setErrors((current) => ({ ...current, [decision.id]: undefined }))
+      return
+    }
+
     if (decision.type === 'asi' && draft.type === 'asi') {
       if (draft.mode === 'ability') {
         if (draft.abilities.some((ability) => !ability)) {
@@ -233,6 +333,7 @@ const handleSkillToggle = (decision: Decision, skill: string) => {
       delete next[decision.id]
       return next
     })
+    setErrors((current) => ({ ...current, [decision.id]: undefined }))
   }
 
   if (pendingDecisions.length === 0) {
@@ -295,6 +396,62 @@ const handleSkillToggle = (decision: Decision, skill: string) => {
                           type="checkbox"
                           checked={selected}
                           onChange={() => handleSkillToggle(decision, option)}
+                          className="h-4 w-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500"
+                          disabled={disabled && !selected}
+                        />
+                        {option}
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+
+              {decision.type === 'choose-language' && draft?.type === 'choose-language' && (
+                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                  {decision.options.map((option: string) => {
+                    const selected = draft.languages.includes(option)
+                    const disabled = !selected && draft.languages.length >= decision.max
+                    return (
+                      <label
+                        key={option}
+                        className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 ${
+                          selected
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-200'
+                            : 'border-slate-200 hover:border-blue-400 dark:border-slate-700 dark:hover:border-blue-400'
+                        } ${disabled ? 'opacity-60' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => handleLanguageToggle(decision, option)}
+                          className="h-4 w-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500"
+                          disabled={disabled && !selected}
+                        />
+                        {option}
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+
+              {decision.type === 'choose-tool' && draft?.type === 'choose-tool' && (
+                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                  {decision.options.map((option: string) => {
+                    const selected = draft.tools.includes(option)
+                    const disabled = !selected && draft.tools.length >= decision.max
+                    return (
+                      <label
+                        key={option}
+                        className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 ${
+                          selected
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-200'
+                            : 'border-slate-200 hover:border-blue-400 dark:border-slate-700 dark:hover:border-blue-400'
+                        } ${disabled ? 'opacity-60' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => handleToolToggle(decision, option)}
                           className="h-4 w-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500"
                           disabled={disabled && !selected}
                         />
