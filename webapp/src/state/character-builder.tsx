@@ -1,12 +1,14 @@
 'use client'
 
-import { createContext, useContext, useMemo, useReducer } from 'react'
+import { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 
 import { abilityList } from '@/lib/abilities'
 import { buildCharacter } from '@/lib/rules/engine'
 import type { ClassDefinition } from '@/data/classes'
 import type { Character, Decision } from '@/types/character'
 import type { Ability, Skill } from '@/types/character'
+
+import { loadCurrentState, persistCurrentState } from './character-storage'
 
 export type AbilityMethod = 'boss-array' | 'manual'
 
@@ -88,6 +90,7 @@ type Action =
   | { type: 'SET_LEVEL'; payload: number }
   | { type: 'RESOLVE_DECISION'; id: string; value: ResolvedDecisionValue }
   | { type: 'CLEAR_DECISION'; id: string }
+  | { type: 'LOAD_STATE'; payload: CharacterBuilderState }
 
 function reducer(state: CharacterBuilderState, action: Action): CharacterBuilderState {
   switch (action.type) {
@@ -191,6 +194,22 @@ function reducer(state: CharacterBuilderState, action: Action): CharacterBuilder
         resolvedDecisions: updated
       }
     }
+    case 'LOAD_STATE':
+      return {
+        ...state,
+        ...action.payload,
+        basics: {
+          ...initialState.basics,
+          ...(action.payload.basics ?? {})
+        },
+        baseAbilities: {
+          ...defaultBaseAbilities,
+          ...(action.payload.baseAbilities ?? {})
+        },
+        resolvedDecisions: {
+          ...(action.payload.resolvedDecisions ?? {})
+        }
+      }
     default:
       return state
   }
@@ -212,13 +231,28 @@ interface CharacterBuilderContextValue {
     setLevel: (level: number) => void
     resolveDecision: (id: string, value: ResolvedDecisionValue) => void
     clearDecision: (id: string) => void
+    loadState: (nextState: CharacterBuilderState) => void
   }
 }
 
 const CharacterBuilderContext = createContext<CharacterBuilderContextValue | undefined>(undefined)
 
 export function CharacterBuilderProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initialState)
+  const [state, dispatch] = useReducer(
+    reducer,
+    initialState,
+    (baseState) => {
+      const stored = loadCurrentState<CharacterBuilderState>()
+      if (!stored) {
+        return baseState
+      }
+      return reducer(baseState, { type: 'LOAD_STATE', payload: stored })
+    }
+  )
+
+  useEffect(() => {
+    persistCurrentState(state)
+  }, [state])
 
   const buildResult = useMemo(() => buildCharacter(state), [state])
 
@@ -235,7 +269,8 @@ export function CharacterBuilderProvider({ children }: { children: React.ReactNo
       setLevel: (level: number) => dispatch({ type: 'SET_LEVEL', payload: level }),
       resolveDecision: (id: string, value: ResolvedDecisionValue) =>
         dispatch({ type: 'RESOLVE_DECISION', id, value }),
-      clearDecision: (id: string) => dispatch({ type: 'CLEAR_DECISION', id })
+      clearDecision: (id: string) => dispatch({ type: 'CLEAR_DECISION', id }),
+      loadState: (nextState: CharacterBuilderState) => dispatch({ type: 'LOAD_STATE', payload: nextState })
     }),
     []
   )
