@@ -10,6 +10,7 @@ import { SavesList } from '@/components/character/SavesList'
 import { SkillsTable } from '@/components/character/SkillsTable'
 import { FeatureList } from '@/components/character/FeatureList'
 import { DecisionQueue } from '@/components/character/DecisionQueue'
+import { CharacterSheet } from '@/components/character/CharacterSheet'
 
 export function AdvancedCharacterLayout() {
   return (
@@ -27,6 +28,15 @@ export function AdvancedCharacterLayout() {
         <SkillsTable />
         <FeatureList />
         <DecisionQueue />
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Printable Character Sheet</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            Review the consolidated sheet that appears on print/PDF exports.
+          </p>
+          <div className="mt-6">
+            <CharacterSheet />
+          </div>
+        </div>
       </div>
     </div>
   )
