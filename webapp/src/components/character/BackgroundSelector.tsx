@@ -1,177 +1,258 @@
-import { useEffect, useState } from 'react';
-import { useCharacterBuilder } from '@/state/character-builder';
+import { useMemo, useState } from "react"
+import { Info } from "lucide-react"
 
-export type Background = {
-  id: string;
-  name: string;
-  entries?: any;
-  skillProficiencies?: any;
-  toolProficiencies?: any;
-  languages?: any;
-  feature?: any;
-  source?: string;
-};
+export type BackgroundRecord = {
+  id: string
+  name: string
+  entries?: any
+  skillProficiencies?: any
+  toolProficiencies?: any
+  languages?: any
+  feature?: any
+  source?: string
+}
 
-export function BackgroundSelector() {
-  const {
-    state: { backgroundId },
-    actions,
-  } = useCharacterBuilder();
-  const [backgrounds, setBackgrounds] = useState<Background[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface BackgroundSelectorProps {
+  backgrounds: BackgroundRecord[]
+  searchTerm: string
+  traitFilter?: string
+  originFilter?: string
+  selectedId?: string | null
+  onSelect: (background: BackgroundRecord) => void
+}
 
-  useEffect(() => {
-    async function fetchBackgrounds() {
-      try {
-        const res = await fetch('/api/backgrounds');
-        if (!res.ok) throw new Error('Failed to fetch backgrounds');
-        const data = await res.json();
-        setBackgrounds(data);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
+function parseList(value: any): string[] {
+  if (!value) return []
+
+  if (typeof value === "string") {
+    return [value]
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => {
+        if (typeof entry === "string") {
+          return entry
+        }
+
+        if (typeof entry === "object" && entry !== null) {
+          if (typeof entry.choose === "object" && Array.isArray(entry.from)) {
+            const count = entry.choose.count ?? 1
+            return `Choose ${count} from ${entry.from.join(", ")}`
+          }
+
+          if (typeof entry.name === "string") {
+            return entry.name
+          }
+
+          return Object.values(entry)
+            .filter((value): value is string => typeof value === "string")
+            .join(" ")
+        }
+
+        return null
+      })
+      .filter((entry): entry is string => Boolean(entry))
+  }
+
+  if (typeof value === "object") {
+    return Object.values(value)
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => entry)
+  }
+
+  return []
+}
+
+function flattenEntries(entries: any): string[] {
+  if (!entries) return []
+
+  if (typeof entries === "string") {
+    return [entries]
+  }
+
+  if (Array.isArray(entries)) {
+    return entries.flatMap((entry) => flattenEntries(entry)).filter(Boolean)
+  }
+
+  if (typeof entries === "object") {
+    if (Array.isArray(entries.entries)) {
+      return flattenEntries(entries.entries)
     }
-    fetchBackgrounds();
-  }, []);
+
+    if (typeof entries.entries === "string") {
+      return [entries.entries]
+    }
+
+    const values = Object.values(entries)
+    if (values.length > 0) {
+      return values.flatMap((value) => flattenEntries(value)).filter(Boolean)
+    }
+  }
+
+  return []
+}
+
+function buildSummary(background: BackgroundRecord): string {
+  const skills = parseList(background.skillProficiencies)
+  const tools = parseList(background.toolProficiencies)
+  const languages = parseList(background.languages)
+  const feature = parseList(background.feature)
+
+  const parts: string[] = []
+
+  if (skills.length > 0) {
+    parts.push(`Skills: ${skills.slice(0, 2).join(", ")}`)
+  }
+
+  if (tools.length > 0) {
+    parts.push(`Tools: ${tools.slice(0, 2).join(", ")}`)
+  }
+
+  if (languages.length > 0) {
+    parts.push(`Languages: ${languages.slice(0, 2).join(", ")}`)
+  }
+
+  if (parts.length === 0 && feature.length > 0) {
+    parts.push(feature[0])
+  }
+
+  if (parts.length === 0) {
+    const entry = flattenEntries(background.entries)[0]
+    if (entry) {
+      return entry.slice(0, 140)
+    }
+    return "No additional summary available"
+  }
+
+  return parts.join(" • ")
+}
+
+export function extractBackgroundValues(value: any): string[] {
+  return parseList(value)
+}
+
+export function getBackgroundSummary(background: BackgroundRecord): string {
+  return buildSummary(background)
+}
+
+export function BackgroundSelector({
+  backgrounds,
+  searchTerm,
+  traitFilter = "all",
+  originFilter = "all",
+  selectedId,
+  onSelect
+}: BackgroundSelectorProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const filteredBackgrounds = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+
+    return backgrounds.filter((background) => {
+      const summary = buildSummary(background)
+      const matchesSearch =
+        normalizedSearch.length === 0 ||
+        background.name.toLowerCase().includes(normalizedSearch) ||
+        summary.toLowerCase().includes(normalizedSearch)
+
+      const skills = parseList(background.skillProficiencies).map((skill) => skill.toLowerCase())
+      const matchesTrait =
+        traitFilter === "all" || skills.some((skill) => skill.includes(traitFilter.toLowerCase()))
+
+      const originValue = background.source ?? ""
+      const matchesOrigin =
+        originFilter === "all" || originValue.toLowerCase().includes(originFilter.toLowerCase())
+
+      return matchesSearch && matchesTrait && matchesOrigin
+    })
+  }, [backgrounds, originFilter, searchTerm, traitFilter])
+
+  if (filteredBackgrounds.length === 0) {
+    return (
+      <p className="text-sm text-slate-600 dark:text-slate-300">
+        No backgrounds match your filters. Adjust the search text or filters to explore more options.
+      </p>
+    )
+  }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {loading ? (
-        <div>Loading backgrounds...</div>
-      ) : error ? (
-        <div className="text-red-500">Error: {error}</div>
-      ) : (
-        backgrounds.map((bg) => {
-          // Parse skill proficiencies
-          const skillProfs = (() => {
-            if (!bg.skillProficiencies || !Array.isArray(bg.skillProficiencies)) return [];
-            return bg.skillProficiencies.map((skill: any) => {
-              if (typeof skill === 'string') return skill;
-              if (typeof skill === 'object' && skill !== null) {
-                if (skill.choose && skill.from) {
-                  const count = skill.choose.count || 1;
-                  const options = Array.isArray(skill.from) ? skill.from.join(', ') : 'Any';
-                  return `Choose ${count} from: ${options}`;
-                }
-                if (skill.name) return skill.name;
-                return Object.keys(skill).join(', ');
-              }
-              return 'Unknown skill';
-            }).filter(Boolean);
-          })();
+    <ul className="space-y-3" role="list">
+      {filteredBackgrounds.map((background) => {
+        const summary = buildSummary(background)
+        const details = [
+          ...parseList(background.skillProficiencies).map((value) => `Skill: ${value}`),
+          ...parseList(background.toolProficiencies).map((value) => `Tool: ${value}`),
+          ...parseList(background.languages).map((value) => `Language: ${value}`),
+          ...parseList(background.feature)
+        ]
+        const entryDetails = flattenEntries(background.entries)
+        const isExpanded = expandedId === background.id
+        const detailId = `background-detail-${background.id}`
 
-          // Parse tool proficiencies
-          const toolProfs = (() => {
-            if (!bg.toolProficiencies || !Array.isArray(bg.toolProficiencies)) return [];
-            return bg.toolProficiencies.map((tool: any) => {
-              if (typeof tool === 'string') return tool;
-              if (typeof tool === 'object' && tool !== null) {
-                if (tool.choose && tool.from) {
-                  const count = tool.choose.count || 1;
-                  const options = Array.isArray(tool.from) ? tool.from.join(', ') : 'Any';
-                  return `Choose ${count} from: ${options}`;
-                }
-                if (tool.name) return tool.name;
-                return Object.keys(tool).join(', ');
-              }
-              return 'Unknown tool';
-            }).filter(Boolean);
-          })();
-
-          // Parse languages
-          const languages = (() => {
-            if (!bg.languages || !Array.isArray(bg.languages)) return [];
-            return bg.languages.map((lang: any) => {
-              if (typeof lang === 'string') return lang;
-              if (typeof lang === 'object' && lang !== null) {
-                if (lang.choose && lang.from) {
-                  const count = lang.choose.count || 1;
-                  const options = Array.isArray(lang.from) ? lang.from.join(', ') : 'Any';
-                  return `Choose ${count} from: ${options}`;
-                }
-                if (lang.name) return lang.name;
-                return 'Choose any language';
-              }
-              return 'Unknown language';
-            }).filter(Boolean);
-          })();
-
-          // Parse feature
-          const feature = (() => {
-            if (!bg.feature) return null;
-            if (typeof bg.feature === 'string') return bg.feature;
-            if (typeof bg.feature === 'object' && bg.feature !== null) {
-              if (bg.feature.name) return bg.feature.name;
-              if (bg.feature.entries && Array.isArray(bg.feature.entries)) {
-                return bg.feature.entries.map((entry: any) => 
-                  typeof entry === 'string' ? entry : JSON.stringify(entry)
-                ).join(' ');
-              }
-            }
-            return null;
-          })();
-
-          return (
+        return (
+          <li key={background.id}>
             <div
-              key={bg.id}
-              className={`border rounded-lg p-4 cursor-pointer ${backgroundId === bg.id ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-950' : 'border-slate-300 bg-transparent dark:border-slate-600'}`}
-              onClick={() => actions.setBackground(bg)}
+              className={`rounded-xl border bg-white/60 p-4 shadow-sm transition dark:bg-slate-900/70 ${
+                selectedId === background.id
+                  ? "border-indigo-500 ring-2 ring-indigo-200 dark:border-indigo-400 dark:ring-indigo-500/40"
+                  : "border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-500"
+              }`}
             >
-              <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">{bg.name}</h3>
-              {bg.source && <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">{bg.source}</p>}
-              
-              {/* Skills - only show if there are any */}
-              {skillProfs.length > 0 && (
-                <div className="mt-2">
-                  <span className="font-semibold text-sm">Skills:</span>
-                  <div className="ml-2 text-sm">
-                    {skillProfs.map((skill, i) => (
-                      <div key={i} className="text-slate-700 dark:text-slate-300">{skill}</div>
-                    ))}
+              <div className="flex items-start gap-3">
+                <button
+                  type="button"
+                  onClick={() => onSelect(background)}
+                  className="flex-1 text-left"
+                  aria-pressed={selectedId === background.id}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{background.name}</h3>
+                      {background.source && (
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          {background.source}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{summary}</p>
+                </button>
 
-              {/* Tools - only show if there are any */}
-              {toolProfs.length > 0 && (
-                <div className="mt-2">
-                  <span className="font-semibold text-sm">Tools:</span>
-                  <div className="ml-2 text-sm">
-                    {toolProfs.map((tool, i) => (
-                      <div key={i} className="text-slate-700 dark:text-slate-300">{tool}</div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setExpandedId((current) => (current === background.id ? null : background.id))
+                  }}
+                  aria-expanded={isExpanded}
+                  aria-controls={detailId}
+                  className="rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-slate-100"
+                >
+                  <Info size={16} />
+                  <span className="sr-only">Toggle details for {background.name}</span>
+                </button>
+              </div>
 
-              {/* Languages - only show if there are any */}
-              {languages.length > 0 && (
-                <div className="mt-2">
-                  <span className="font-semibold text-sm">Languages:</span>
-                  <div className="ml-2 text-sm">
-                    {languages.map((lang, i) => (
-                      <div key={i} className="text-slate-700 dark:text-slate-300">{lang}</div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Feature - only show if there is one */}
-              {feature && (
-                <div className="mt-2">
-                  <span className="font-semibold text-sm">Feature:</span>
-                  <div className="ml-2 text-sm text-slate-700 dark:text-slate-300">
-                    {feature}
-                  </div>
+              {isExpanded && (details.length > 0 || entryDetails.length > 0) && (
+                <div
+                  id={detailId}
+                  role="region"
+                  aria-live="polite"
+                  className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
+                >
+                  {details.map((detail, index) => (
+                    <p key={`detail-${index}`}>{detail}</p>
+                  ))}
+                  {entryDetails.map((paragraph, index) => (
+                    <p key={`entry-${index}`}>{paragraph}</p>
+                  ))}
                 </div>
               )}
             </div>
-          );
-        })
-        )}
-    </div>
-  );
+          </li>
+        )
+      })}
+    </ul>
+  )
 }
