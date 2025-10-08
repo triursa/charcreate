@@ -71,6 +71,15 @@ function buildStringMatchCondition(field: string, values: string[]) {
   }
 }
 
+function buildStringContainsCondition(field: string, value: string) {
+  return {
+    [field]: {
+      contains: value,
+      mode: 'insensitive',
+    },
+  }
+}
+
 async function loadFilterOptions(delegate: any, columnSet: Set<string>): Promise<FilterOptions> {
   const selection: Record<string, boolean> = {}
 
@@ -170,7 +179,37 @@ export default async function DataPage({ searchParams }: { searchParams: RawSear
   const whereClauses: any[] = []
 
   if (q) {
-    whereClauses.push({ name: { contains: q, mode: 'insensitive' } })
+    const searchClauses: any[] = [buildStringContainsCondition('name', q)]
+
+    if (columnSet.has('source')) {
+      searchClauses.push(buildStringContainsCondition('source', q))
+    }
+
+    if (columnSet.has('origin')) {
+      searchClauses.push(buildStringContainsCondition('origin', q))
+    }
+
+    const fuzzyJsonFields = [
+      'traitTags',
+      'traits',
+      'featureType',
+      'skillProficiencies',
+      'tags',
+      'miscTags',
+      'areaTags',
+      'damageInflict',
+      'damageResist',
+      'damageImmune',
+      'damageVulnerable',
+    ].filter(field => columnSet.has(field))
+
+    if (fuzzyJsonFields.length) {
+      searchClauses.push({
+        OR: fuzzyJsonFields.map(field => buildJsonArrayCondition(field, q)),
+      })
+    }
+
+    whereClauses.push({ OR: searchClauses })
   }
 
   if (selectedFilters.trait.length) {
