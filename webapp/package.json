@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "build-tests": "tsc --project tsconfig.test.json",
-    "test": "npm run build-tests && node --test --experimental-specifier-resolution=node .test-build/tests/**/*.js"
+    "test": "npm run build-tests && node scripts/setup-test-alias.mjs && NODE_PATH=.test-build node --test --experimental-specifier-resolution=node --experimental-loader ./scripts/test-loader.mjs .test-build/tests/**/*.js"
   },
   "dependencies": {
     "@prisma/client": "^6.16.3",

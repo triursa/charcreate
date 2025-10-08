@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useReducer } from 'react
 
 import { abilityList } from '@/lib/abilities'
 import { buildCharacter } from '@/lib/rules/engine'
-import type { ClassDefinition } from '@/data/classes'
+import type { CatalogueClass, FeatDefinition } from '@/types/catalogue'
 import type { AncestryRecord, BackgroundRecord } from '@/types/character-builder'
 import type { Character, Decision } from '@/types/character'
 import type { Ability, Skill } from '@/types/character'
@@ -32,7 +32,7 @@ export type ResolvedDecisionValue =
   | { type: 'choose-tool'; choices: string[] }
   | { type: 'choose-feat'; featId: string }
   | { type: 'asi'; mode: 'ability'; abilities: Ability[] }
-  | { type: 'asi'; mode: 'feat'; featId: string; abilitySelection?: Ability }
+  | { type: 'asi'; mode: 'feat'; featId: string; feat?: FeatDefinition; abilitySelection?: Ability }
   | { type: 'choose-subclass'; choice: string }
   | { type: 'custom'; data: unknown }
 
@@ -46,7 +46,7 @@ export interface CharacterBuilderState {
   backgroundId?: string
   backgroundData?: BackgroundRecord
   classId?: string
-  classData?: ClassDefinition
+  classData?: CatalogueClass
   level: number
   resolvedDecisions: Partial<Record<string, ResolvedDecisionValue>>
 }
@@ -87,7 +87,7 @@ type Action =
   | { type: 'APPLY_BOSS_ARRAY' }
   | { type: 'SET_ANCESTRY'; payload: string | undefined | AncestryRecord }
   | { type: 'SET_BACKGROUND'; payload: string | undefined | BackgroundRecord }
-  | { type: 'SET_CLASS'; payload: string | undefined | ClassDefinition }
+  | { type: 'SET_CLASS'; payload: string | undefined | CatalogueClass }
   | { type: 'SET_LEVEL'; payload: number }
   | { type: 'RESOLVE_DECISION'; id: string; value: ResolvedDecisionValue }
   | { type: 'CLEAR_DECISION'; id: string }
@@ -228,7 +228,7 @@ interface CharacterBuilderContextValue {
     applyBossArray: () => void
     setAncestry: (id: string | undefined | AncestryRecord) => void
     setBackground: (id: string | undefined | BackgroundRecord) => void
-    setClass: (id: string | undefined | ClassDefinition) => void
+    setClass: (id: string | undefined | CatalogueClass) => void
     setLevel: (level: number) => void
     resolveDecision: (id: string, value: ResolvedDecisionValue) => void
     clearDecision: (id: string) => void
@@ -266,7 +266,7 @@ export function CharacterBuilderProvider({ children }: { children: React.ReactNo
       applyBossArray: () => dispatch({ type: 'APPLY_BOSS_ARRAY' }),
       setAncestry: (id: string | undefined | AncestryRecord) => dispatch({ type: 'SET_ANCESTRY', payload: id }),
       setBackground: (id: string | undefined | BackgroundRecord) => dispatch({ type: 'SET_BACKGROUND', payload: id }),
-      setClass: (id: string | undefined | ClassDefinition) => dispatch({ type: 'SET_CLASS', payload: id }),
+      setClass: (id: string | undefined | CatalogueClass) => dispatch({ type: 'SET_CLASS', payload: id }),
       setLevel: (level: number) => dispatch({ type: 'SET_LEVEL', payload: level }),
       resolveDecision: (id: string, value: ResolvedDecisionValue) =>
         dispatch({ type: 'RESOLVE_DECISION', id, value }),

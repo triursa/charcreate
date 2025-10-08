@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { abilityList } from '@/lib/abilities'
-import { feats } from '@/data/feats'
+import { useFeats } from '@/hooks/useFeats'
 import type { Ability, Decision, Skill } from '@/types/character'
+import type { FeatDefinition } from '@/types/catalogue'
 import { useCharacterBuilder } from '@/state/character-builder'
 import type { ResolvedDecisionValue } from '@/state/character-builder'
 
@@ -47,8 +48,12 @@ export function DecisionQueue() {
 
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
   const [errors, setErrors] = useState<Record<string, string | undefined>>({})
+  const { feats, isLoading: isFeatsLoading } = useFeats()
+  const featById = useMemo<Record<string, FeatDefinition>>(
+    () => Object.fromEntries(feats.map((feat) => [feat.id, feat])),
+    [feats]
+  )
 
-  const featById = useMemo(() => Object.fromEntries(feats.map((feat) => [feat.id, feat])), [])
 
   useEffect(() => {
     setDrafts((current) => {
@@ -249,7 +254,7 @@ export function DecisionQueue() {
           type: 'asi',
           mode: 'feat',
           featId,
-          abilitySelection: undefined
+          abilitySelection: existing.featId === featId ? existing.abilitySelection : undefined
         }
       }
     })
@@ -353,6 +358,7 @@ export function DecisionQueue() {
         type: 'asi',
         mode: 'feat',
         featId: draft.featId,
+        feat,
         abilitySelection: draft.abilitySelection || undefined
       })
       setErrors((current) => ({ ...current, [decision.id]: undefined }))
@@ -574,9 +580,12 @@ export function DecisionQueue() {
                         <select
                           value={draft.featId ?? ''}
                           onChange={(event) => handleFeatChange(decision.id, event.target.value)}
+                          disabled={isFeatsLoading && feats.length === 0}
                           className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         >
-                          <option value="">Select a feat</option>
+                          <option value="">
+                            {isFeatsLoading && feats.length === 0 ? 'Loading feats…' : 'Select a feat'}
+                          </option>
                           {feats.map((feat) => (
                             <option key={feat.id} value={feat.id}>
                               {feat.name}

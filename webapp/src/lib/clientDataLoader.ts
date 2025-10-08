@@ -154,7 +154,11 @@ export async function loadAllContent(): Promise<AllContent> {
       })
 
       mergeIntoAllContentCache(content)
-      return allContentCache as AllContent
+      const cached = allContentCache
+      if (!cached) {
+        throw new Error('Failed to populate content cache')
+      }
+      return cached
     } catch (error) {
       allContentCache = null
       throw error

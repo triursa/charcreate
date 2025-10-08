@@ -3,7 +3,6 @@
 import { useMemo } from 'react'
 
 import { abilityList, abilityMod, formatModifier } from '@/lib/abilities'
-import { classMap } from '@/data/classes'
 import { useCharacterBuilder } from '@/state/character-builder'
 
 function Panel({ children, title }: { children: React.ReactNode; title: string }) {
@@ -72,7 +71,7 @@ export function CharacterSheet() {
   const { character, state, pendingDecisions } = useCharacterBuilder()
 
   const primaryClassId = character.classes[0]?.classId
-  const primaryClass = state.classData ?? (primaryClassId ? classMap[primaryClassId] : undefined)
+  const primaryClass = state.classData
   const primarySubclass = useMemo(() => {
     if (!primaryClass) return undefined
     const selectedSubclassId = character.classes[0]?.subclassId
