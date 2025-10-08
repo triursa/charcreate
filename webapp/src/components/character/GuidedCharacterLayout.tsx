@@ -1,9 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { AbilityGrid } from '@/components/character/AbilityGrid'
 import {
   AncestrySelector,
   type AncestryRecord,
@@ -15,13 +13,16 @@ import {
   extractBackgroundValues,
   getBackgroundSummary
 } from '@/components/character/BackgroundSelector'
-import { ClassLeveler } from '@/components/character/ClassLeveler'
-import { DecisionQueue } from '@/components/character/DecisionQueue'
-import { FeatureList } from '@/components/character/FeatureList'
-import { OverviewCard } from '@/components/character/OverviewCard'
-import { StatsPanel } from '@/components/character/StatsPanel'
+import {
+  AbilityScoresStep,
+  AncestryStep,
+  BackgroundStep,
+  BasicsStep,
+  ClassLevelsStep,
+  DecisionResolutionStep,
+  SummaryStep
+} from '@/components/character/steps'
 import { useCharacterBuilder } from '@/state/character-builder'
-import { CharacterSheet } from '@/components/character/CharacterSheet'
 import {
   SelectionModal,
   type SelectionModalFilterConfig
@@ -32,11 +33,14 @@ interface StepStatus {
   message?: string
 }
 
+import type { ComponentType } from 'react'
+
 interface StepDefinition {
   id: string
   title: string
   description: string
-  render: () => ReactNode
+  component: ComponentType<any>
+  getProps: () => Record<string, unknown>
   getStatus: () => StepStatus
 }
 
@@ -156,6 +160,21 @@ export function GuidedCharacterLayout() {
     return backgrounds.find((background) => background.id === state.backgroundId)
   }, [backgrounds, state.backgroundData, state.backgroundId])
 
+  const ancestrySummary = selectedAncestry ? getAncestrySummary(selectedAncestry) : undefined
+  const ancestryPlaceholderSummary =
+    'Browse the ancestry catalog to discover cultural traits, ability boosts, and story hooks.'
+
+  const backgroundSummary = selectedBackground ? getBackgroundSummary(selectedBackground) : undefined
+  const backgroundPlaceholderSummary =
+    'Open the background library to find the experiences, skills, and connections that shaped your hero.'
+
+  const handleTargetLevelChange = useCallback(
+    (level: number) => {
+      setTargetLevel(level)
+    },
+    [setTargetLevel]
+  )
+
   const ancestryFilters: SelectionModalFilterConfig[] = useMemo(() => {
     const traitOptions = Array.from(
       new Set(
@@ -249,11 +268,8 @@ export function GuidedCharacterLayout() {
         id: 'basics',
         title: 'Basics',
         description: 'Name, descriptor, and campaign notes for your character.',
-        render: () => (
-          <div className="space-y-4">
-            <OverviewCard />
-          </div>
-        ),
+        component: BasicsStep,
+        getProps: () => ({}),
         getStatus: () => ({
           complete: Boolean(state.basics.name?.trim()),
           message: 'Add a character name to continue.'
@@ -262,60 +278,21 @@ export function GuidedCharacterLayout() {
       {
         id: 'ancestry',
         title: 'Ancestry',
-        description: 'Choose the lineage that shapes your hero&apos;s culture and traits.',
-        render: () => (
-          <div className="space-y-4">
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Select an Ancestry</h2>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                Filter through the compendium of available ancestries and pick the best thematic fit.
-              </p>
-              <div className="mt-4 space-y-4">
-                <div className="rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/80">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Current Selection
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    {selectedAncestry?.name ?? 'No ancestry selected yet'}
-                  </p>
-                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                    {selectedAncestry
-                      ? getAncestrySummary(selectedAncestry)
-                      : 'Browse the ancestry catalog to discover cultural traits, ability boosts, and story hooks.'}
-                  </p>
-                </div>
-
-                {ancestryError && (
-                  <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200">
-                    {ancestryError}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsAncestryModalOpen(true)}
-                    className="inline-flex items-center justify-center rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900"
-                  >
-                    Browse ancestries
-                  </button>
-                  {selectedAncestry && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        actions.setAncestry(undefined)
-                        setPendingAncestryId(null)
-                      }}
-                      className="text-sm font-medium text-slate-600 underline-offset-2 transition hover:underline dark:text-slate-300"
-                    >
-                      Clear selection
-                    </button>
-                  )}
-                </div>
-              </div>
-            </section>
-          </div>
-        ),
+        description: "Choose the lineage that shapes your hero's culture and traits.",
+        component: AncestryStep,
+        getProps: () => ({
+          selectedName: selectedAncestry?.name,
+          summary: ancestrySummary,
+          placeholderSummary: ancestryPlaceholderSummary,
+          error: ancestryError,
+          onBrowse: () => setIsAncestryModalOpen(true),
+          onClear: selectedAncestry
+            ? () => {
+                actions.setAncestry(undefined)
+                setPendingAncestryId(null)
+              }
+            : undefined
+        }),
         getStatus: () => ({
           complete: Boolean(state.ancestryId),
           message: 'Select an ancestry to continue.'
@@ -325,59 +302,20 @@ export function GuidedCharacterLayout() {
         id: 'background',
         title: 'Background',
         description: 'Determine the experiences that shaped your adventurer before the campaign.',
-        render: () => (
-          <div className="space-y-4">
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Choose a Background</h2>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                Backgrounds grant proficiencies, gear, and roleplaying hooks that inform your hero&apos;s past.
-              </p>
-              <div className="mt-4 space-y-4">
-                <div className="rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/80">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Current Selection
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    {selectedBackground?.name ?? 'No background selected yet'}
-                  </p>
-                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                    {selectedBackground
-                      ? getBackgroundSummary(selectedBackground)
-                      : 'Open the background library to find the experiences, skills, and connections that shaped your hero.'}
-                  </p>
-                </div>
-
-                {backgroundError && (
-                  <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200">
-                    {backgroundError}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsBackgroundModalOpen(true)}
-                    className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900"
-                  >
-                    Browse backgrounds
-                  </button>
-                  {selectedBackground && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        actions.setBackground(undefined)
-                        setPendingBackgroundId(null)
-                      }}
-                      className="text-sm font-medium text-slate-600 underline-offset-2 transition hover:underline dark:text-slate-300"
-                    >
-                      Clear selection
-                    </button>
-                  )}
-                </div>
-              </div>
-            </section>
-          </div>
-        ),
+        component: BackgroundStep,
+        getProps: () => ({
+          selectedName: selectedBackground?.name,
+          summary: backgroundSummary,
+          placeholderSummary: backgroundPlaceholderSummary,
+          error: backgroundError,
+          onBrowse: () => setIsBackgroundModalOpen(true),
+          onClear: selectedBackground
+            ? () => {
+                actions.setBackground(undefined)
+                setPendingBackgroundId(null)
+              }
+            : undefined
+        }),
         getStatus: () => ({
           complete: Boolean(state.backgroundId),
           message: 'Select a background to continue.'
@@ -387,19 +325,8 @@ export function GuidedCharacterLayout() {
         id: 'ability-scores',
         title: 'Ability Scores',
         description: 'Assign starting ability scores using your preferred method.',
-        render: () => (
-          <div className="space-y-4">
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Tune Ability Scores</h2>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                Use manual entry or the boss array to assign values before racial adjustments are applied.
-              </p>
-              <div className="mt-4">
-                <AbilityGrid />
-              </div>
-            </section>
-          </div>
-        ),
+        component: AbilityScoresStep,
+        getProps: () => ({}),
         getStatus: () => ({
           complete: true
         })
@@ -408,53 +335,13 @@ export function GuidedCharacterLayout() {
         id: 'class-levels',
         title: 'Class & Levels',
         description: 'Pick a class, set a target level, and walk through each level gain.',
-        render: () => (
-          <div className="space-y-6">
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Set Your Goal Level</h2>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                Choose the level you want to build towards, then use the progression controls below to reach it.
-              </p>
-              <div className="mt-4 space-y-4">
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    min={1}
-                    max={20}
-                    step={1}
-                    value={targetLevel}
-                    onChange={(event) => setTargetLevel(Number.parseInt(event.target.value, 10))}
-                    className="flex-1 accent-blue-500"
-                  />
-                  <span className="w-20 text-center text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    Level {targetLevel}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Current level: {state.level}. {state.level === targetLevel
-                    ? 'Target reached. Confirm any choices unlocked below.'
-                    : state.level < targetLevel
-                      ? `Level up ${targetLevel - state.level} more time(s) to meet your goal.`
-                      : `Reduce your level to ${targetLevel} if you overshot your target.`}
-                </p>
-              </div>
-            </section>
-
-            <ClassLeveler />
-
-            {pendingDecisions.length > 0 && (
-              <section className="rounded-2xl border border-blue-200 bg-white p-6 shadow-sm dark:border-blue-500/60 dark:bg-slate-900">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Resolve Pending Decisions</h3>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                  Leveling unlocked new class options. Finalize them here before moving on.
-                </p>
-                <div className="mt-4">
-                  <DecisionQueue />
-                </div>
-              </section>
-            )}
-          </div>
-        ),
+        component: ClassLevelsStep,
+        getProps: () => ({
+          targetLevel,
+          currentLevel: state.level,
+          onTargetLevelChange: handleTargetLevelChange,
+          pendingDecisionCount: pendingDecisions.length
+        }),
         getStatus: () => {
           if (state.level !== targetLevel) {
             return {
@@ -477,11 +364,8 @@ export function GuidedCharacterLayout() {
         id: 'decision-resolution',
         title: 'Decision Resolution',
         description: 'Confirm that all feat, ASI, and skill selections are locked in.',
-        render: () => (
-          <div className="space-y-4">
-            <DecisionQueue />
-          </div>
-        ),
+        component: DecisionResolutionStep,
+        getProps: () => ({}),
         getStatus: () => ({
           complete: pendingDecisions.length === 0,
           message: pendingDecisions.length > 0 ? 'Work through each queued decision to proceed.' : undefined
@@ -491,36 +375,32 @@ export function GuidedCharacterLayout() {
         id: 'summary',
         title: 'Summary',
         description: 'Review your full printable character sheet before exporting.',
-        render: () => (
-          <div className="space-y-6">
-            <StatsPanel />
-            <FeatureList />
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Printable Character Sheet</h2>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                This consolidated sheet displays the information that will be exported or printed.
-              </p>
-              <div className="mt-6">
-                <CharacterSheet />
-              </div>
-            </div>
-          </div>
-        ),
+        component: SummaryStep,
+        getProps: () => ({}),
         getStatus: () => ({ complete: true })
       }
     ],
     [
+      actions,
+      ancestryError,
+      ancestryPlaceholderSummary,
+      ancestrySummary,
+      backgroundError,
+      backgroundPlaceholderSummary,
+      backgroundSummary,
       pendingDecisions.length,
+      selectedAncestry,
+      selectedBackground,
+      setIsAncestryModalOpen,
+      setIsBackgroundModalOpen,
+      setPendingAncestryId,
+      setPendingBackgroundId,
       state.ancestryId,
       state.backgroundId,
       state.basics.name,
       state.level,
       targetLevel,
-      selectedAncestry,
-      selectedBackground,
-      ancestryError,
-      backgroundError,
-      actions
+      handleTargetLevelChange
     ]
   )
 
@@ -555,13 +435,16 @@ export function GuidedCharacterLayout() {
   }
 
   const nextLabel = isLastStep ? 'Complete' : 'Next'
+  const activeStep = steps[activeStepIndex]
+  const ActiveStepComponent = activeStep?.component
+  const activeStepProps = activeStep?.getProps() ?? {}
 
   return (
     <>
       <div className="mt-8">
         <div className="mx-auto flex max-w-4xl flex-col gap-6">
           <ol className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          {steps.map((step, index) => {
+            {steps.map((step, index) => {
             const status = statuses[index]
             const isActive = index === activeStepIndex
             const isComplete = status.complete && index !== activeStepIndex
@@ -603,10 +486,10 @@ export function GuidedCharacterLayout() {
               </li>
             )
           })}
-        </ol>
+          </ol>
 
         <div className="space-y-6">
-          {steps[activeStepIndex]?.render()}
+          {ActiveStepComponent ? <ActiveStepComponent {...activeStepProps} /> : null}
 
           <div className="flex flex-col gap-4 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
             <button
