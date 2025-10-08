@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
 import { ContentDataProvider } from '@/state/content-data'
+import { CharacterBuilderProvider } from '@/state/character-builder'
 
 type Theme = 'light' | 'dark'
 
@@ -52,7 +53,9 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      <ContentDataProvider>{children}</ContentDataProvider>
+      <CharacterBuilderProvider>
+        <ContentDataProvider>{children}</ContentDataProvider>
+      </CharacterBuilderProvider>
     </ThemeContext.Provider>
   )
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import ClientTable from '../data/ClientTable'
+import ClientTable, { type RenderActionHelpers } from '../data/ClientTable'
 import type { AdminModelKey, AdminModelMeta } from './models'
 import { ADMIN_FORM_CONFIG, type AdminFormField } from './formConfig'
 
@@ -16,10 +16,6 @@ export type AdminTableManagerProps = {
 type FlashState = { status: 'success' | 'error'; message: string } | null
 
 type PendingAction = { type: 'add' | 'edit'; entry?: any } | null
-
-type RenderActionHelpers = {
-  closeEntry: () => void
-}
 
 function resolveDefaultValue(field: AdminFormField, entry: any) {
   if (!entry) return ''
@@ -89,7 +85,12 @@ export default function AdminTableManager({ model, rows, columns, models }: Admi
     router.push(`/admin?${params.toString()}`, { scroll: false })
   }
 
-  const renderActions = (entry: any, { closeEntry }: RenderActionHelpers) => {
+  const renderActions = (entry: any, helpers: RenderActionHelpers) => {
+    if (helpers.location !== 'modal') {
+      return null
+    }
+
+    const { closeEntry } = helpers
     const entryId = entry?.id
     const hasId = typeof entryId === 'number' || typeof entryId === 'string'
 
