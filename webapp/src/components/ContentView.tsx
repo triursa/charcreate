@@ -162,6 +162,19 @@ export function ContentView({ category, searchQuery, onSearch }: ContentViewProp
     }
   }, [category, getAllContent, getCategoryData, hasCategoryData, hasFullContent, isSearch, knownCategory])
 
+  const getFilteredCategoryContent = useCallback((sourceContent: RecordWithType[]) => {
+    let result = [...sourceContent]
+
+    if (searchQuery.trim()) {
+      const searchResults = searchAllContent({ [category]: sourceContent }, searchQuery, 100)
+      result = searchResults.map((r) => ({ ...r.item, _type: r.type, _score: r.score }))
+    }
+
+    result = filterContent(result, category, filters)
+    result.sort((a, b) => (a.name || a.title || "").localeCompare(b.name || b.title || ""))
+    return result
+  }, [category, filters, searchQuery])
+
   useEffect(() => {
     if (isSearch) {
       setContent([])
@@ -190,19 +203,6 @@ export function ContentView({ category, searchQuery, onSearch }: ContentViewProp
     setFilterOptions(options)
     setFilteredContent(getFilteredCategoryContent(data))
   }, [aggregatedContent, category, categoryData, getFilteredCategoryContent, hasCategoryData, isSearch, knownCategory])
-
-  const getFilteredCategoryContent = useCallback((sourceContent: RecordWithType[]) => {
-    let result = [...sourceContent]
-
-    if (searchQuery.trim()) {
-      const searchResults = searchAllContent({ [category]: sourceContent }, searchQuery, 100)
-      result = searchResults.map((r) => ({ ...r.item, _type: r.type, _score: r.score }))
-    }
-
-    result = filterContent(result, category, filters)
-    result.sort((a, b) => (a.name || a.title || "").localeCompare(b.name || b.title || ""))
-    return result
-  }, [category, filters, searchQuery])
 
   const applySearch = useCallback(() => {
     if (!searchQuery.trim()) {
