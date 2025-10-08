@@ -1,200 +1,228 @@
-import { useMemo, useState } from "react";
-import { Info } from "lucide-react";
+import { Info } from 'lucide-react'
+import { useMemo, useState } from 'react'
 
-export interface AncestryRecord {
-  id: string;
-  name: string;
-  source?: string;
-  size?: any;
-  speed?: any;
-  ability?: any;
-  traitTags?: string[];
-  languageProficiencies?: any;
-  entries?: any;
-}
+import type {
+  AbilityScoreDefinition,
+  AbilityScoreEntry,
+  AncestryRecord,
+  EntryLike,
+  SpeedDefinition,
+  StructuredEntry
+} from '@/types/character-builder'
 
 export interface AncestrySelectorProps {
-  ancestries?: AncestryRecord[];
-  searchTerm?: string;
-  traitFilter?: string;
-  originFilter?: string;
-  selectedId?: string | null;
-  onSelect: (ancestry: AncestryRecord) => void;
+  ancestries?: AncestryRecord[]
+  searchTerm?: string
+  traitFilter?: string
+  originFilter?: string
+  selectedId?: string | null
+  onSelect: (ancestry: AncestryRecord) => void
 }
 
-function formatAbilitySummary(ability: any): string | null {
-  if (!ability) return null;
+function isStructuredEntry(value: unknown): value is StructuredEntry {
+  return typeof value === 'object' && value !== null
+}
+
+function isEntryLike(value: unknown): value is EntryLike {
+  if (typeof value === 'string') return true
+  if (Array.isArray(value)) {
+    return value.every((item) => isEntryLike(item))
+  }
+  return isStructuredEntry(value)
+}
+
+function isAbilityScoreEntry(value: unknown): value is AbilityScoreEntry {
+  return isStructuredEntry(value)
+}
+
+function formatAbilityEntry(entry: AbilityScoreEntry): string[] {
+  const numeric = Object.entries(entry)
+    .filter(([key, value]) => key !== 'choose' && typeof value === 'number')
+    .map(([key, value]) => `${key.toUpperCase()} +${value}`)
+
+  if (numeric.length > 0) {
+    return numeric
+  }
+
+  const choice = entry.choose
+  const options = Array.isArray(choice?.from)
+    ? choice?.from
+    : Array.isArray((entry as { from?: string[] }).from)
+      ? (entry as { from?: string[] }).from
+      : undefined
+  if (choice && options && options.length > 0) {
+    const count = choice.count ?? 1
+    return [`Choose ${count} from ${options.join(', ')}`]
+  }
+
+  return []
+}
+
+function formatAbilitySummary(ability: AbilityScoreDefinition | undefined): string | null {
+  if (!ability) return null
+
+  if (typeof ability === 'string') {
+    return ability
+  }
 
   if (Array.isArray(ability)) {
-    const parts = ability
-      .map((entry) => {
-        if (typeof entry === "object" && entry !== null) {
-          return Object.entries(entry)
-            .filter(([_, value]) => typeof value === "number")
-            .map(([key, value]) => `${key.toUpperCase()} +${value}`)
-            .join(", ");
-        }
-        if (typeof entry === "string") {
-          return entry;
-        }
-        return null;
-      })
-      .filter(Boolean) as string[];
+    const parts = ability.flatMap((entry) => {
+      if (typeof entry === 'string') {
+        return entry
+      }
+      if (isAbilityScoreEntry(entry)) {
+        return formatAbilityEntry(entry)
+      }
+      return []
+    })
 
     if (parts.length > 0) {
-      return parts.join(", ");
+      return parts.join(', ')
+    }
+    return null
+  }
+
+  if (isAbilityScoreEntry(ability)) {
+    const parts = formatAbilityEntry(ability)
+    if (parts.length > 0) {
+      return parts.join(', ')
     }
   }
 
-  if (typeof ability === "object" && ability !== null) {
-    const numeric = Object.entries(ability)
-      .filter(([_, value]) => typeof value === "number")
-      .map(([key, value]) => `${key.toUpperCase()} +${value}`);
-
-    if (numeric.length > 0) {
-      return numeric.join(", ");
-    }
-  }
-
-  if (typeof ability === "string") {
-    return ability;
-  }
-
-  return null;
+  return null
 }
 
-function formatSpeedSummary(speed: any): string | null {
-  if (!speed) return null;
-
-  if (typeof speed === "number") {
-    return `${speed} ft speed`;
-  }
-
-  if (typeof speed === "object") {
-    if (typeof speed.walk === "number") {
-      return `${speed.walk} ft speed`;
-    }
-
-    const entries = Object.entries(speed)
-      .filter(([key]) => key !== "choose")
-      .map(([key, value]) => `${key} ${value}`);
-
-    if (entries.length > 0) {
-      return entries.join(", ");
-    }
-  }
-
-  return null;
+function isSpeedRecord(value: unknown): value is Exclude<SpeedDefinition, number> {
+  return typeof value === 'object' && value !== null
 }
 
-function flattenEntries(entries: any): string[] {
-  if (!entries) return [];
+function formatSpeedSummary(speed: SpeedDefinition | undefined): string | null {
+  if (typeof speed === 'number') {
+    return `${speed} ft speed`
+  }
 
-  if (typeof entries === "string") {
-    return [entries];
+  if (!speed || !isSpeedRecord(speed)) {
+    return null
+  }
+
+  if (typeof speed.walk === 'number') {
+    return `${speed.walk} ft speed`
+  }
+
+  const entries = Object.entries(speed)
+    .filter(([key, value]) => key !== 'choose' && typeof value === 'number')
+    .map(([key, value]) => `${key} ${value}`)
+
+  if (entries.length > 0) {
+    return entries.join(', ')
+  }
+
+  return null
+}
+
+function flattenEntries(entries: EntryLike | undefined): string[] {
+  if (!entries) return []
+
+  if (typeof entries === 'string') {
+    return [entries]
   }
 
   if (Array.isArray(entries)) {
-    return (entries as any[]).flatMap((entry) => flattenEntries(entry)).filter(Boolean) as string[];
+    return entries.flatMap((entry) => flattenEntries(entry)).filter(Boolean)
   }
 
-  if (typeof entries === "object") {
-    if (Array.isArray(entries.entries)) {
-      return flattenEntries(entries.entries);
+  if (isStructuredEntry(entries)) {
+    if (entries.entries) {
+      return flattenEntries(entries.entries)
     }
 
-    if (typeof entries.entries === "string") {
-      return [entries.entries];
-    }
-
-    const values = Object.values(entries);
-    if (values.length > 0) {
-      return values.flatMap((value) => flattenEntries(value)).filter(Boolean) as string[];
-    }
+    return Object.values(entries)
+      .filter(isEntryLike)
+      .flatMap((value) => flattenEntries(value))
   }
 
-  return [];
+  return []
 }
 
 function buildSummary(ancestry: AncestryRecord): string {
-  const abilitySummary = formatAbilitySummary(ancestry.ability);
-  const speedSummary = formatSpeedSummary(ancestry.speed);
-  const traitSummary = ancestry.traitTags?.slice(0, 2).join(", ");
+  const abilitySummary = formatAbilitySummary(ancestry.ability)
+  const speedSummary = formatSpeedSummary(ancestry.speed)
+  const traitSummary = ancestry.traitTags?.slice(0, 2).join(', ')
 
-  const parts = [abilitySummary, speedSummary, traitSummary].filter(Boolean) as string[];
+  const parts = [abilitySummary, speedSummary, traitSummary].filter(Boolean) as string[]
 
   if (parts.length === 0) {
-    const entry = flattenEntries(ancestry.entries)[0];
+    const entry = flattenEntries(ancestry.entries)[0]
     if (entry) {
-      return entry.slice(0, 140);
+      return entry.slice(0, 140)
     }
-    return "No additional summary available";
+    return 'No additional summary available'
   }
 
-  return parts.join(" • ");
+  return parts.join(' • ')
 }
 
 export function getAncestrySummary(ancestry: AncestryRecord): string {
-  return buildSummary(ancestry);
+  return buildSummary(ancestry)
 }
 
 export function AncestrySelector(props: AncestrySelectorProps) {
   const {
     ancestries = [],
-    searchTerm = "",
-    traitFilter = "all",
-    originFilter = "all",
+    searchTerm = '',
+    traitFilter = 'all',
+    originFilter = 'all',
     selectedId,
-    onSelect,
-  } = props;
+    onSelect
+  } = props
 
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const filteredAncestries = useMemo(() => {
-    const normalizedSearch = (searchTerm ?? "").trim().toLowerCase();
+    const normalizedSearch = (searchTerm ?? '').trim().toLowerCase()
 
-    return (ancestries ?? []).filter((ancestry: AncestryRecord) => {
+    return (ancestries ?? []).filter((ancestry) => {
       const matchesSearch =
         normalizedSearch.length === 0 ||
         ancestry.name.toLowerCase().includes(normalizedSearch) ||
-        buildSummary(ancestry).toLowerCase().includes(normalizedSearch);
+        buildSummary(ancestry).toLowerCase().includes(normalizedSearch)
 
       const matchesTrait =
-        traitFilter === "all" ||
+        traitFilter === 'all' ||
         (Array.isArray(ancestry.traitTags) &&
-          ancestry.traitTags.some((tag: string) => tag.toLowerCase() === (traitFilter ?? "").toLowerCase()));
+          ancestry.traitTags.some((tag) => tag.toLowerCase() === (traitFilter ?? '').toLowerCase()))
 
-      const originValue = ancestry.source ?? "";
+      const originValue = ancestry.source ?? ''
       const matchesOrigin =
-        originFilter === "all" || originValue.toLowerCase().includes((originFilter ?? "").toLowerCase());
+        originFilter === 'all' || originValue.toLowerCase().includes((originFilter ?? '').toLowerCase())
 
-      return matchesSearch && matchesTrait && matchesOrigin;
-    });
-  }, [ancestries, originFilter, searchTerm, traitFilter]);
+      return matchesSearch && matchesTrait && matchesOrigin
+    })
+  }, [ancestries, originFilter, searchTerm, traitFilter])
 
   if (filteredAncestries.length === 0) {
     return (
       <p className="text-sm text-slate-600 dark:text-slate-300">
         No ancestries match your filters. Try adjusting the search text or filter values.
       </p>
-    );
+    )
   }
 
   return (
     <ul className="space-y-3" role="list">
-      {filteredAncestries.map((ancestry: AncestryRecord) => {
-        const summary = buildSummary(ancestry);
-        const detailParagraphs = flattenEntries(ancestry.entries);
-        const isExpanded = expandedId === ancestry.id;
-        const detailId = `ancestry-detail-${ancestry.id}`;
+      {filteredAncestries.map((ancestry) => {
+        const summary = buildSummary(ancestry)
+        const detailParagraphs = flattenEntries(ancestry.entries)
+        const isExpanded = expandedId === ancestry.id
+        const detailId = `ancestry-detail-${ancestry.id}`
 
         return (
           <li key={ancestry.id}>
             <div
               className={`rounded-xl border bg-white/60 p-4 shadow-sm transition dark:bg-slate-900/70 ${
                 selectedId === ancestry.id
-                  ? "border-blue-500 ring-2 ring-blue-200 dark:border-blue-400 dark:ring-blue-500/40"
-                  : "border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-500"
+                  ? 'border-blue-500 ring-2 ring-blue-200 dark:border-blue-400 dark:ring-blue-500/40'
+                  : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-500'
               }`}
             >
               <div className="flex items-start gap-3">
@@ -220,8 +248,8 @@ export function AncestrySelector(props: AncestrySelectorProps) {
                 <button
                   type="button"
                   onClick={(event) => {
-                    event.stopPropagation();
-                    setExpandedId((current) => (current === ancestry.id ? null : ancestry.id));
+                    event.stopPropagation()
+                    setExpandedId((current) => (current === ancestry.id ? null : ancestry.id))
                   }}
                   aria-expanded={isExpanded}
                   aria-controls={detailId}
@@ -239,15 +267,15 @@ export function AncestrySelector(props: AncestrySelectorProps) {
                   aria-live="polite"
                   className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
                 >
-                  {detailParagraphs.map((paragraph: string, index: number) => (
+                  {detailParagraphs.map((paragraph, index) => (
                     <p key={index}>{paragraph}</p>
                   ))}
                 </div>
               )}
             </div>
           </li>
-        );
+        )
       })}
     </ul>
-  );
+  )
 }

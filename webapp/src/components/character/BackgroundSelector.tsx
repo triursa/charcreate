@@ -1,16 +1,7 @@
-import { useMemo, useState } from "react"
-import { Info } from "lucide-react"
+import { Info } from 'lucide-react'
+import { useMemo, useState } from 'react'
 
-export type BackgroundRecord = {
-  id: string
-  name: string
-  entries?: any
-  skillProficiencies?: any
-  toolProficiencies?: any
-  languages?: any
-  feature?: any
-  source?: string
-}
+import type { BackgroundRecord, EntryLike, StructuredEntry } from '@/types/character-builder'
 
 interface BackgroundSelectorProps {
   backgrounds: BackgroundRecord[]
@@ -21,53 +12,67 @@ interface BackgroundSelectorProps {
   onSelect: (background: BackgroundRecord) => void
 }
 
-function parseList(value: any): string[] {
+function isStructuredEntry(value: unknown): value is StructuredEntry {
+  return typeof value === 'object' && value !== null
+}
+
+function isEntryLike(value: unknown): value is EntryLike {
+  if (typeof value === 'string') return true
+  if (Array.isArray(value)) {
+    return value.every((entry) => isEntryLike(entry))
+  }
+  return isStructuredEntry(value)
+}
+
+function parseList(value: EntryLike | undefined): string[] {
   if (!value) return []
 
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     return [value]
   }
 
   if (Array.isArray(value)) {
-    return value
-      .map((entry) => {
-        if (typeof entry === "string") {
-          return entry
-        }
-
-        if (typeof entry === "object" && entry !== null) {
-          if (typeof entry.choose === "object" && Array.isArray(entry.from)) {
-            const count = entry.choose.count ?? 1
-            return `Choose ${count} from ${entry.from.join(", ")}`
-          }
-
-          if (typeof entry.name === "string") {
-            return entry.name
-          }
-
-          return Object.values(entry)
-            .filter((value): value is string => typeof value === "string")
-            .join(" ")
-        }
-
-        return null
-      })
-      .filter((entry): entry is string => Boolean(entry))
+    return value.flatMap((entry) => parseList(entry)).filter(Boolean)
   }
 
-  if (typeof value === "object") {
-    return Object.values(value)
-      .filter((entry): entry is string => typeof entry === "string")
-      .map((entry) => entry)
+  if (isStructuredEntry(value)) {
+    const parts: string[] = []
+
+    if (typeof value.name === 'string') {
+      parts.push(value.name)
+    }
+
+    const choice = value.choose
+    const options = Array.isArray(choice?.from)
+      ? choice?.from
+      : Array.isArray(value.from)
+        ? value.from
+        : undefined
+    if (choice && options && options.length > 0) {
+      const count = choice.count ?? 1
+      parts.push(`Choose ${count} from ${options.join(', ')}`)
+    }
+
+    if (value.entries) {
+      parts.push(...parseList(value.entries))
+    }
+
+    const nested = Object.entries(value)
+      .filter(([key]) => key !== 'name' && key !== 'choose' && key !== 'from' && key !== 'entries')
+      .map(([, nestedValue]) => nestedValue)
+      .filter(isEntryLike)
+      .flatMap((nestedValue) => parseList(nestedValue))
+
+    return [...parts, ...nested]
   }
 
   return []
 }
 
-function flattenEntries(entries: any): string[] {
+function flattenEntries(entries: EntryLike | undefined): string[] {
   if (!entries) return []
 
-  if (typeof entries === "string") {
+  if (typeof entries === 'string') {
     return [entries]
   }
 
@@ -75,19 +80,14 @@ function flattenEntries(entries: any): string[] {
     return entries.flatMap((entry) => flattenEntries(entry)).filter(Boolean)
   }
 
-  if (typeof entries === "object") {
-    if (Array.isArray(entries.entries)) {
+  if (isStructuredEntry(entries)) {
+    if (entries.entries) {
       return flattenEntries(entries.entries)
     }
 
-    if (typeof entries.entries === "string") {
-      return [entries.entries]
-    }
-
-    const values = Object.values(entries)
-    if (values.length > 0) {
-      return values.flatMap((value) => flattenEntries(value)).filter(Boolean)
-    }
+    return Object.values(entries)
+      .filter(isEntryLike)
+      .flatMap((value) => flattenEntries(value))
   }
 
   return []
@@ -102,15 +102,15 @@ function buildSummary(background: BackgroundRecord): string {
   const parts: string[] = []
 
   if (skills.length > 0) {
-    parts.push(`Skills: ${skills.slice(0, 2).join(", ")}`)
+    parts.push(`Skills: ${skills.slice(0, 2).join(', ')}`)
   }
 
   if (tools.length > 0) {
-    parts.push(`Tools: ${tools.slice(0, 2).join(", ")}`)
+    parts.push(`Tools: ${tools.slice(0, 2).join(', ')}`)
   }
 
   if (languages.length > 0) {
-    parts.push(`Languages: ${languages.slice(0, 2).join(", ")}`)
+    parts.push(`Languages: ${languages.slice(0, 2).join(', ')}`)
   }
 
   if (parts.length === 0 && feature.length > 0) {
@@ -122,13 +122,13 @@ function buildSummary(background: BackgroundRecord): string {
     if (entry) {
       return entry.slice(0, 140)
     }
-    return "No additional summary available"
+    return 'No additional summary available'
   }
 
-  return parts.join(" • ")
+  return parts.join(' • ')
 }
 
-export function extractBackgroundValues(value: any): string[] {
+export function extractBackgroundValues(value: EntryLike | undefined): string[] {
   return parseList(value)
 }
 
@@ -139,35 +139,35 @@ export function getBackgroundSummary(background: BackgroundRecord): string {
 export function BackgroundSelector(props: BackgroundSelectorProps) {
   const {
     backgrounds = [],
-    searchTerm = "",
-    traitFilter = "all",
-    originFilter = "all",
+    searchTerm = '',
+    traitFilter = 'all',
+    originFilter = 'all',
     selectedId,
     onSelect
-  } = props;
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  } = props
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const filteredBackgrounds = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const normalizedSearch = searchTerm.trim().toLowerCase()
 
-    return backgrounds.filter((background: BackgroundRecord) => {
-      const summary = buildSummary(background);
+    return backgrounds.filter((background) => {
+      const summary = buildSummary(background)
       const matchesSearch =
         normalizedSearch.length === 0 ||
         background.name.toLowerCase().includes(normalizedSearch) ||
-        summary.toLowerCase().includes(normalizedSearch);
+        summary.toLowerCase().includes(normalizedSearch)
 
-      const skills = parseList(background.skillProficiencies).map((skill: string) => skill.toLowerCase());
+      const skills = parseList(background.skillProficiencies).map((skill) => skill.toLowerCase())
       const matchesTrait =
-        traitFilter === "all" || skills.some((skill: string) => skill.includes(traitFilter.toLowerCase()));
+        traitFilter === 'all' || skills.some((skill) => skill.includes(traitFilter.toLowerCase()))
 
-      const originValue = background.source ?? "";
+      const originValue = background.source ?? ''
       const matchesOrigin =
-        originFilter === "all" || originValue.toLowerCase().includes(originFilter.toLowerCase());
+        originFilter === 'all' || originValue.toLowerCase().includes(originFilter.toLowerCase())
 
-      return matchesSearch && matchesTrait && matchesOrigin;
-    });
-  }, [backgrounds, originFilter, searchTerm, traitFilter]);
+      return matchesSearch && matchesTrait && matchesOrigin
+    })
+  }, [backgrounds, originFilter, searchTerm, traitFilter])
 
   if (filteredBackgrounds.length === 0) {
     return (

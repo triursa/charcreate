@@ -20,6 +20,27 @@ export type Skill =
   | 'Stealth'
   | 'Survival'
 
+export const skillNames: Skill[] = [
+  'Acrobatics',
+  'Animal Handling',
+  'Arcana',
+  'Athletics',
+  'Deception',
+  'History',
+  'Insight',
+  'Intimidation',
+  'Investigation',
+  'Medicine',
+  'Nature',
+  'Perception',
+  'Performance',
+  'Persuasion',
+  'Religion',
+  'Sleight of Hand',
+  'Stealth',
+  'Survival'
+]
+
 export type AbilityScore = Ability
 
 export interface AbilityBlock {

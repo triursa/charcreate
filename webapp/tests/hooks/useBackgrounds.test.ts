@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { beforeEach, test } from 'node:test'
 
-import type { BackgroundRecord } from '../../src/components/character/BackgroundSelector.js'
+import type { BackgroundRecord } from '../../src/types/character-builder.js'
 import { __resetBackgroundCacheForTests, useBackgrounds } from '../../src/hooks/useBackgrounds.js'
 import { type RenderHookController, renderHook } from '../utils/renderHook.js'
 
