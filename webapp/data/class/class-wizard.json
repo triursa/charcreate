@@ -1,0 +1,13 @@
+{
+  "class": [
+    {
+      "name": "Wizard",
+      "primaryAbility": ["INT"],
+      "hitDice": "d6",
+      "proficiencies": {"armor": [], "weapons": ["Daggers", "Quarterstaffs"]},
+      "classFeatures": [{"name": "Arcane Recovery", "level": 1}],
+      "subclassFeatures": [{"name": "School of Evocation", "level": 2}],
+      "spellcasting": {"progression": "full"}
+    }
+  ]
+}

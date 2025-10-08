@@ -59,6 +59,7 @@ model Class {
   classFeatures Json?
   subclassFeatures Json?
   spellcasting Json?
+  optionalfeatureProgression Json?
 }
 
 model Spell {
@@ -78,4 +79,45 @@ model Spell {
   damageImmune Json?
   damageVulnerable Json?
   savingThrow Json?
+}
+
+model OptionalFeature {
+  id                   String @id
+  name                 String
+  source               String?
+  featureType          Json?
+  prerequisite         Json?
+  prerequisiteSummary  Json?
+  entries              Json?
+  entriesHigherLevel   Json?
+  additionalSpells     Json?
+  addSpells            Json?
+  removeSpells         Json?
+  gainSubclassFeature  Json?
+  gainAnotherFeature   Json?
+  otherSources         Json?
+  page                 Json?
+  className            Json?
+  classSource          Json?
+  subclassName         Json?
+  subclassShortName    Json?
+  subclassSource       Json?
+  level                Json?
+  ability              Json?
+  savingThrowProficiencies Json?
+  skillProficiencies   Json?
+  toolProficiencies    Json?
+  languageProficiencies Json?
+  flags                Json?
+  repeatable           Json?
+  prerequisiteAbility  Json?
+  prerequisiteSpell    Json?
+  otherPrerequisites   Json?
+  fluff                Json?
+  hasFluff             Json?
+  hasFluffImages       Json?
+  srd                  Json?
+  srd52                Json?
+  basicRules           Json?
+  data                 Json?
 }

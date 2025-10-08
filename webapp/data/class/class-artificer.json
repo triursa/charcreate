@@ -1,0 +1,13 @@
+{
+  "class": [
+    {
+      "name": "Artificer",
+      "primaryAbility": ["INT"],
+      "hitDice": "d8",
+      "proficiencies": {"armor": ["Light", "Medium"], "weapons": ["Simple"]},
+      "classFeatures": [{"name": "Infuse Item", "level": 2}],
+      "subclassFeatures": [],
+      "spellcasting": {"progression": "full"}
+    }
+  ]
+}

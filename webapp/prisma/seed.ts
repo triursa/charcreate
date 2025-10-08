@@ -15,6 +15,12 @@ async function importJson(file: string) {
   return JSON.parse(raw)
 }
 
+function pickDefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, v]) => v !== undefined)
+  ) as T
+}
+
 async function main() {
   // Quick hardcoded seed for ancestries
   await prisma.race.createMany({
@@ -112,6 +118,95 @@ async function main() {
     await prisma.feat.create({ data: { name, entries, prerequisite } });
   }
 
+  // Optional Features
+  const optionalFeaturesJson = await importJson('optionalfeatures.json')
+  for (const optionalFeature of optionalFeaturesJson.optionalfeature || []) {
+    const {
+      name,
+      source,
+      featureType,
+      prerequisite,
+      prerequisiteSummary,
+      entries,
+      entriesHigherLevel,
+      additionalSpells,
+      addSpells,
+      removeSpells,
+      gainSubclassFeature,
+      gainAnotherFeature,
+      otherSources,
+      page,
+      className,
+      classSource,
+      subclassName,
+      subclassShortName,
+      subclassSource,
+      level,
+      ability,
+      savingThrowProficiencies,
+      skillProficiencies,
+      toolProficiencies,
+      languageProficiencies,
+      flags,
+      repeatable,
+      prerequisiteAbility,
+      prerequisiteSpell,
+      otherPrerequisites,
+      fluff,
+      hasFluff,
+      hasFluffImages,
+      srd,
+      srd52,
+      basicRules,
+      data
+    } = optionalFeature;
+
+    const id = optionalFeature.id ?? `${optionalFeature.source ?? 'unknown'}|${optionalFeature.name}`
+
+    await prisma.optionalFeature.create({
+      data: pickDefined({
+        id,
+        name,
+        source,
+        featureType,
+        prerequisite,
+        prerequisiteSummary,
+        entries,
+        entriesHigherLevel,
+        additionalSpells,
+        addSpells,
+        removeSpells,
+        gainSubclassFeature,
+        gainAnotherFeature,
+        otherSources,
+        page,
+        className,
+        classSource,
+        subclassName,
+        subclassShortName,
+        subclassSource,
+        level,
+        ability,
+        savingThrowProficiencies,
+        skillProficiencies,
+        toolProficiencies,
+        languageProficiencies,
+        flags,
+        repeatable,
+        prerequisiteAbility,
+        prerequisiteSpell,
+        otherPrerequisites,
+        fluff,
+        hasFluff,
+        hasFluffImages,
+        srd,
+        srd52,
+        basicRules,
+        data
+      })
+    })
+  }
+
   // Classes
   const classFiles = [
     'class/class-artificer.json',
@@ -139,9 +234,10 @@ async function main() {
         proficiencies,
         classFeatures,
         subclassFeatures,
-        spellcasting
+        spellcasting,
+        optionalfeatureProgression
       } = cls;
-      await prisma.class.create({ data: { name, primaryAbility, hitDice, proficiencies, classFeatures, subclassFeatures, spellcasting } });
+      await prisma.class.create({ data: pickDefined({ name, primaryAbility, hitDice, proficiencies, classFeatures, subclassFeatures, spellcasting, optionalfeatureProgression }) });
     }
   }
 

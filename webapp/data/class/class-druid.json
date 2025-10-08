@@ -1,0 +1,13 @@
+{
+  "class": [
+    {
+      "name": "Druid",
+      "primaryAbility": ["WIS"],
+      "hitDice": "d8",
+      "proficiencies": {"armor": ["Light", "Medium"], "weapons": ["Clubs", "Daggers"]},
+      "classFeatures": [{"name": "Wild Shape", "level": 2}],
+      "subclassFeatures": [{"name": "Circle of the Land", "level": 2}],
+      "spellcasting": {"progression": "full"}
+    }
+  ]
+}

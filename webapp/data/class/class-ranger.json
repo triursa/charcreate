@@ -1,0 +1,22 @@
+{
+  "class": [
+    {
+      "name": "Ranger",
+      "primaryAbility": ["DEX", "WIS"],
+      "hitDice": "d10",
+      "proficiencies": {"armor": ["Light", "Medium", "Shields"], "weapons": ["Simple", "Martial"]},
+      "classFeatures": [{"name": "Favored Enemy", "level": 1}],
+      "subclassFeatures": [{"name": "Hunter", "level": 3}],
+      "spellcasting": {"progression": "half"},
+      "optionalfeatureProgression": [
+        {
+          "name": "Fighting Style",
+          "featureType": ["AF:FS"],
+          "progression": [
+            {"level": 2, "count": 1}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "item": [
+    {
+      "name": "Longsword",
+      "type": "M",
+      "entries": ["A versatile blade favored by knights and adventurers alike."],
+      "rarity": "Common",
+      "value": 15,
+      "weight": 3
+    }
+  ]
+}
