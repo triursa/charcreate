@@ -64,6 +64,15 @@ const searchConfigs = {
       { name: 'source', weight: 0.5 }
     ],
     threshold: 0.3
+  },
+  optionalfeatures: {
+    keys: [
+      { name: 'name', weight: 2 },
+      { name: 'entries', weight: 1 },
+      { name: 'featureType', weight: 1 },
+      { name: 'source', weight: 0.5 }
+    ],
+    threshold: 0.3
   }
 }
 
