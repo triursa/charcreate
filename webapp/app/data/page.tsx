@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import { ADMIN_MODELS, normalizeAdminModel } from '../admin/models'
 import { getAdminColumns, getAdminDelegate } from '../admin/helpers'
 
-const DataBrowserClient = dynamic(() => import('./DataBrowserClient'), { ssr: false })
+const DataBrowserClient = dynamic(() => import('./DataBrowserPlannerClient'), { ssr: false })
 
 const PAGE_SIZE = 20
 const MODELS = ADMIN_MODELS.map(({ key, label }) => ({ key, label }))

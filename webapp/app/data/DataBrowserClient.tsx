@@ -1,12 +1,20 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ChangeEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ChangeEvent,
+  type ReactNode,
+} from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Fuse from 'fuse.js'
 import clsx from 'clsx'
 
-import ClientTable from './ClientTable'
+import ClientTable, { type RenderActionHelpers } from './ClientTable'
 
 type FilterKey = 'trait' | 'origin' | 'source' | 'tag'
 
@@ -14,7 +22,7 @@ type FilterState = Record<FilterKey, string[]>
 
 type FilterOptions = FilterState
 
-type DataBrowserClientProps = {
+export type DataBrowserClientProps = {
   model: string
   rows: any[]
   columns: string[]
@@ -25,6 +33,9 @@ type DataBrowserClientProps = {
   filterOptions: FilterOptions
   selectedFilters: FilterState
   sort: string
+  renderActions?: (entry: any, helpers: RenderActionHelpers) => ReactNode
+  isRowSelected?: (entry: any) => boolean
+  statusMessage?: string | null
 }
 
 const DEFAULT_SORT = 'name:asc'
@@ -94,6 +105,9 @@ export default function DataBrowserClient(props: DataBrowserClientProps) {
     filterOptions,
     selectedFilters,
     sort,
+    renderActions,
+    isRowSelected,
+    statusMessage,
   } = props
 
   const router = useRouter()
@@ -229,6 +243,15 @@ export default function DataBrowserClient(props: DataBrowserClientProps) {
   return (
     <div>
       <div className="mb-6 space-y-4">
+        {statusMessage ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
+          >
+            {statusMessage}
+          </div>
+        ) : null}
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <form onSubmit={handleSearchSubmit} className="flex w-full flex-wrap gap-2 md:max-w-2xl">
             <input
@@ -300,7 +323,12 @@ export default function DataBrowserClient(props: DataBrowserClientProps) {
         </div>
       </div>
 
-      <ClientTable rows={filteredRows} columns={columns} />
+      <ClientTable
+        rows={filteredRows}
+        columns={columns}
+        renderActions={renderActions}
+        isRowSelected={isRowSelected}
+      />
 
       <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="text-sm text-slate-600">

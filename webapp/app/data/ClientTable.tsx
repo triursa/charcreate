@@ -1,13 +1,23 @@
 "use client"
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import clsx from 'clsx'
 
 import { EntryModal } from './EntryModal'
 
 type ClientTableProps = {
   rows: any[]
   columns: string[]
-  renderActions?: (entry: any, helpers: { closeEntry: () => void }) => ReactNode
+  renderActions?: (entry: any, helpers: RenderActionHelpers) => ReactNode
+  isRowSelected?: (entry: any) => boolean
+}
+
+export type RenderActionLocation = 'card' | 'modal'
+
+export type RenderActionHelpers = {
+  location: RenderActionLocation
+  openEntry?: () => void
+  closeEntry: () => void
 }
 
 const SUMMARY_FIELD_NAMES = new Set([
@@ -432,7 +442,7 @@ function getRowKey(row: any, index: number): string | number {
   return `${name}-${index}`
 }
 
-export default function ClientTable({ rows, columns, renderActions }: ClientTableProps) {
+export default function ClientTable({ rows, columns, renderActions, isRowSelected }: ClientTableProps) {
   const [activeEntry, setActiveEntry] = useState<any | null>(null)
   const [activeEntryKey, setActiveEntryKey] = useState<string | number | null>(null)
 
@@ -455,7 +465,7 @@ export default function ClientTable({ rows, columns, renderActions }: ClientTabl
   const activeSourceLabel = useMemo(() => extractSourceLabel(activeEntry?.source), [activeEntry])
   const activeFooter = useMemo(() => {
     if (!renderActions || !activeEntry) return undefined
-    return renderActions(activeEntry, { closeEntry })
+    return renderActions(activeEntry, { location: 'modal', closeEntry })
   }, [activeEntry, closeEntry, renderActions])
 
   return (
@@ -468,6 +478,7 @@ export default function ClientTable({ rows, columns, renderActions }: ClientTabl
           const headingId = `entry-${normalizedKey}-title`
           const summaryId = `entry-${normalizedKey}-summary`
           const modalId = `entry-modal-${normalizedKey}`
+          const selected = isRowSelected ? Boolean(isRowSelected(row)) : false
 
           const abilitySummary = formatAbilitySummary(
             row?.ability ?? row?.abilityBoosts ?? row?.abilityBonuses ?? row?.abilityBonus,
@@ -486,35 +497,66 @@ export default function ClientTable({ rows, columns, renderActions }: ClientTabl
             .filter(Boolean)
             .join('. ')
 
+          const cardActions = renderActions
+            ? renderActions(row, {
+                location: 'card',
+                openEntry: () => openEntry(row, rowKey),
+                closeEntry,
+              })
+            : null
+
+          const showDefaultPreview = !cardActions
+
           return (
             <article
               key={rowKey}
-              className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500"
+              className={clsx(
+                'flex flex-col justify-between gap-4 rounded-2xl border bg-white p-5 shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-blue-500',
+                selected
+                  ? 'border-blue-400 shadow-md ring-2 ring-blue-400/30 hover:shadow-lg'
+                  : 'border-slate-200 hover:shadow-md',
+              )}
               aria-labelledby={headingId}
               aria-describedby={summaryId}
             >
               <div className="flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 id={headingId} className="truncate text-lg font-semibold text-slate-900">
-                      {entryName}
-                    </h2>
+                    <div className="flex items-center gap-2">
+                      <h2 id={headingId} className="truncate text-lg font-semibold text-slate-900">
+                        {entryName}
+                      </h2>
+                      {selected ? (
+                        <span className="shrink-0 rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
+                          Selected
+                        </span>
+                      ) : null}
+                    </div>
                     {sourceLabel && (
                       <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
                         {sourceLabel}
                       </p>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => openEntry(row, rowKey)}
-                    className="shrink-0 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                    aria-haspopup="dialog"
-                    aria-controls={modalId}
-                    aria-label={`View detailed information for ${entryName}`}
-                  >
-                    View Details
-                  </button>
+                  <div className="flex flex-col items-end gap-2">
+                    {showDefaultPreview ? (
+                      <button
+                        type="button"
+                        onClick={() => openEntry(row, rowKey)}
+                        className="shrink-0 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        aria-haspopup="dialog"
+                        aria-controls={modalId}
+                        aria-label={`Preview detailed information for ${entryName}`}
+                      >
+                        Preview
+                      </button>
+                    ) : null}
+                    {cardActions ? (
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {cardActions}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div id={summaryId} className="space-y-3 text-sm text-slate-700">
