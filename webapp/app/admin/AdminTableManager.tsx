@@ -3,18 +3,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ClientTable from '../data/ClientTable'
-
-export type AdminModelOption = {
-  key: string
-  label: string
-  singularLabel: string
-}
+import type { AdminModelKey, AdminModelMeta } from './models'
 
 export type AdminTableManagerProps = {
-  model: string
+  model: AdminModelKey
   rows: any[]
   columns: string[]
-  models: ReadonlyArray<AdminModelOption>
+  models: ReadonlyArray<AdminModelMeta>
 }
 
 type FlashState = { status: 'success' | 'error'; message: string } | null
@@ -42,13 +37,22 @@ export default function AdminTableManager({ model, rows, columns, models }: Admi
     router.replace(params.size > 0 ? `/admin?${params.toString()}` : '/admin', { scroll: false })
   }, [router, searchParams])
 
-  const fallbackModel = useMemo(() => models[0] ?? { key: model, label: model, singularLabel: model }, [models, model])
+  const fallbackModel = useMemo(
+    () =>
+      models[0] ?? {
+        key: model,
+        label: model,
+        singularLabel: model,
+        prismaModel: model,
+      },
+    [models, model],
+  )
   const activeModel = useMemo(
     () => models.find(option => option.key === model) ?? fallbackModel,
     [fallbackModel, model, models],
   )
 
-  const handleModelChange = (nextModel: string) => {
+  const handleModelChange = (nextModel: AdminModelKey) => {
     if (nextModel === model) return
 
     const params = new URLSearchParams(searchParams.toString())

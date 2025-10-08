@@ -1,55 +1,96 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { buildAdminRedirectUrl, describePrismaError, loadSpellDuplicates, parseIdParam } from '../helpers'
+import {
+  buildAdminRedirectUrl,
+  describePrismaError,
+  loadAdminDuplicateGroups,
+  mergeAdminDuplicateGroup,
+  parseAdminModelParam,
+  parseIdParam,
+  UnsupportedDuplicateOperationError,
+} from '../helpers'
 
 export async function POST(request: NextRequest) {
   const baseUrl = new URL(request.url)
-  const idParam = parseIdParam(request.nextUrl.searchParams.get('id'))
+  const params = request.nextUrl.searchParams
 
-  if (!idParam.ok) {
-    const url = buildAdminRedirectUrl(baseUrl, 'error', idParam.error)
+  const modelResult = parseAdminModelParam(params.get('model'))
+  const model = modelResult.ok ? modelResult.model : modelResult.fallback
+  const modelMeta = modelResult.meta
+
+  if (!modelResult.ok) {
+    const url = buildAdminRedirectUrl(baseUrl, 'error', modelResult.error, { model })
     return NextResponse.redirect(url, { status: 303 })
   }
 
-  const rawName = request.nextUrl.searchParams.get('name')?.trim()
+  const idResult = parseIdParam(params.get('id'))
 
-  if (!rawName) {
-    const url = buildAdminRedirectUrl(baseUrl, 'error', 'Missing entry name.')
+  if (!idResult.ok) {
+    const url = buildAdminRedirectUrl(baseUrl, 'error', idResult.error, { model })
+    return NextResponse.redirect(url, { status: 303 })
+  }
+
+  const identifier = params.get('name')?.trim()
+
+  if (!identifier) {
+    const url = buildAdminRedirectUrl(baseUrl, 'error', 'Missing entry name.', { model })
     return NextResponse.redirect(url, { status: 303 })
   }
 
   try {
-    const duplicates = await loadSpellDuplicates()
-    const match = duplicates.find(([name]) => name === rawName)
+    const duplicates = await loadAdminDuplicateGroups(model, prisma)
+    const match = duplicates.find(group => group.identifier === identifier)
 
     if (!match) {
-      const url = buildAdminRedirectUrl(baseUrl, 'error', `No duplicates found for ${rawName}.`)
+      const url = buildAdminRedirectUrl(baseUrl, 'error', `No duplicates found for ${identifier}.`, { model })
       return NextResponse.redirect(url, { status: 303 })
     }
 
-    const [name, entries] = match
-    const canonical = entries.find(entry => entry.id === idParam.id)
+    const canonical = match.entries.find(entry => entry.id === idResult.id)
 
     if (!canonical) {
-      const url = buildAdminRedirectUrl(baseUrl, 'error', `Entry ${idParam.id} does not match ${name}.`)
+      const url = buildAdminRedirectUrl(
+        baseUrl,
+        'error',
+        `${modelMeta.singularLabel} ${idResult.id} does not match ${identifier}.`,
+        { model },
+      )
       return NextResponse.redirect(url, { status: 303 })
     }
 
-    const idsToDelete = entries.filter(entry => entry.id !== canonical.id).map(entry => entry.id)
+    const { deletedIds } = await mergeAdminDuplicateGroup(model, canonical.id, match, prisma)
 
-    if (idsToDelete.length === 0) {
-      const url = buildAdminRedirectUrl(baseUrl, 'error', `No additional duplicates to merge for ${name}.`)
+    if (deletedIds.length === 0) {
+      const url = buildAdminRedirectUrl(
+        baseUrl,
+        'error',
+        `No additional duplicates to merge for ${identifier}.`,
+        { model },
+      )
       return NextResponse.redirect(url, { status: 303 })
     }
 
-    await prisma.spell.deleteMany({ where: { id: { in: idsToDelete } } })
-
-    const url = buildAdminRedirectUrl(baseUrl, 'success', `Merged ${idsToDelete.length + 1} entries for ${name}.`)
+    const url = buildAdminRedirectUrl(
+      baseUrl,
+      'success',
+      `Merged ${deletedIds.length + 1} entries for ${identifier}.`,
+      { model },
+    )
     return NextResponse.redirect(url, { status: 303 })
   } catch (error) {
+    if (error instanceof UnsupportedDuplicateOperationError) {
+      const url = buildAdminRedirectUrl(
+        baseUrl,
+        'error',
+        `Merging duplicates is not supported for ${modelMeta.label}.`,
+        { model },
+      )
+      return NextResponse.redirect(url, { status: 303 })
+    }
+
     console.error('Failed to merge duplicates', error)
     const message = describePrismaError(error)
-    const url = buildAdminRedirectUrl(baseUrl, 'error', message)
+    const url = buildAdminRedirectUrl(baseUrl, 'error', message, { model })
     return NextResponse.redirect(url, { status: 303 })
   }
 }
