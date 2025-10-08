@@ -1,0 +1,13 @@
+{
+  "class": [
+    {
+      "name": "Barbarian",
+      "primaryAbility": ["STR"],
+      "hitDice": "d12",
+      "proficiencies": {"armor": ["Light", "Medium"], "weapons": ["Simple", "Martial"]},
+      "classFeatures": [{"name": "Rage", "level": 1}],
+      "subclassFeatures": [{"name": "Path of the Berserker", "level": 3}],
+      "spellcasting": null
+    }
+  ]
+}

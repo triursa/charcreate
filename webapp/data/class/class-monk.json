@@ -1,0 +1,13 @@
+{
+  "class": [
+    {
+      "name": "Monk",
+      "primaryAbility": ["DEX", "WIS"],
+      "hitDice": "d8",
+      "proficiencies": {"armor": [], "weapons": ["Simple", "Shortswords"]},
+      "classFeatures": [{"name": "Martial Arts", "level": 1}],
+      "subclassFeatures": [{"name": "Way of the Open Hand", "level": 3}],
+      "spellcasting": null
+    }
+  ]
+}

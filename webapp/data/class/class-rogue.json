@@ -1,0 +1,13 @@
+{
+  "class": [
+    {
+      "name": "Rogue",
+      "primaryAbility": ["DEX"],
+      "hitDice": "d8",
+      "proficiencies": {"armor": ["Light"], "weapons": ["Simple", "Hand crossbows", "Longswords", "Rapiers", "Shortswords"]},
+      "classFeatures": [{"name": "Sneak Attack", "level": 1}],
+      "subclassFeatures": [{"name": "Thief", "level": 3}],
+      "spellcasting": null
+    }
+  ]
+}

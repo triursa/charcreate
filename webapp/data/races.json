@@ -1,0 +1,16 @@
+{
+  "race": [
+    {
+      "name": "Dwarf",
+      "source": "PHB",
+      "size": "M",
+      "speed": { "walk": 25 },
+      "ability": { "CON": 2 },
+      "traitTags": ["Darkvision"],
+      "languageProficiencies": ["Common", "Dwarvish"],
+      "entries": [
+        "Dwarves are sturdy, tradition-bound folk known for their skill in warfare and metalwork."
+      ]
+    }
+  ]
+}
