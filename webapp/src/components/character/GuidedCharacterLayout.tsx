@@ -22,34 +22,26 @@ import {
   DecisionResolutionStep,
   SummaryStep
 } from '@/components/character/steps'
+import { Stepper } from '@/components/character/Stepper'
 import { useAncestries } from '@/hooks/useAncestries'
 import { useBackgrounds } from '@/hooks/useBackgrounds'
+import { type StepDefinition, useStepper } from '@/hooks/useStepper'
 import { useCharacterBuilder } from '@/state/character-builder'
 import {
   SelectionModal,
   type SelectionModalFilterConfig
 } from '@/components/character/SelectionModal'
 
-interface StepStatus {
-  complete: boolean
-  message?: string
-}
-
 import type { ComponentType } from 'react'
 
-interface StepDefinition {
-  id: string
-  title: string
-  description: string
+interface GuidedCharacterStepDefinition extends StepDefinition {
   component: ComponentType<any>
   getProps: () => Record<string, unknown>
-  getStatus: () => StepStatus
 }
 
 export function GuidedCharacterLayout() {
   const { state, pendingDecisions, actions } = useCharacterBuilder()
 
-  const [activeStepIndex, setActiveStepIndex] = useState(0)
   const [targetLevel, setTargetLevel] = useState(() => Math.max(1, state.level))
   const [isAncestryModalOpen, setIsAncestryModalOpen] = useState(false)
   const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false)
@@ -219,7 +211,7 @@ export function GuidedCharacterLayout() {
     setIsBackgroundModalOpen(false)
   }
 
-  const steps: StepDefinition[] = useMemo(
+  const steps: GuidedCharacterStepDefinition[] = useMemo(
     () => [
       {
         id: 'basics',
@@ -361,38 +353,19 @@ export function GuidedCharacterLayout() {
     ]
   )
 
-  const statuses = steps.map((step) => step.getStatus())
-  const currentStatus = statuses[activeStepIndex]
-  const isLastStep = activeStepIndex === steps.length - 1
-
-  const isStepUnlocked = (index: number) => {
-    if (index === activeStepIndex) return true
-    return statuses.slice(0, index).every((status) => status.complete)
-  }
-
-  const handleStepChange = (index: number) => {
-    if (index === activeStepIndex) return
-    if (isStepUnlocked(index)) {
-      setActiveStepIndex(index)
-    }
-  }
-
-  const handleNext = () => {
-    if (isLastStep) {
-      return
-    }
-
-    if (currentStatus.complete) {
-      setActiveStepIndex((index) => Math.min(steps.length - 1, index + 1))
-    }
-  }
-
-  const handleBack = () => {
-    setActiveStepIndex((index) => Math.max(0, index - 1))
-  }
+  const {
+    activeStepIndex,
+    activeStep,
+    statuses,
+    currentStatus,
+    isLastStep,
+    goTo,
+    next,
+    previous,
+    isStepUnlocked
+  } = useStepper({ steps })
 
   const nextLabel = isLastStep ? 'Complete' : 'Next'
-  const activeStep = steps[activeStepIndex]
   const ActiveStepComponent = activeStep?.component
   const activeStepProps = activeStep?.getProps() ?? {}
 
@@ -400,50 +373,13 @@ export function GuidedCharacterLayout() {
     <>
       <div className="mt-8">
         <div className="mx-auto flex max-w-4xl flex-col gap-6">
-          <ol className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            {steps.map((step, index) => {
-            const status = statuses[index]
-            const isActive = index === activeStepIndex
-            const isComplete = status.complete && index !== activeStepIndex
-            const stepNumber = index + 1
-
-            return (
-              <li
-                key={step.id}
-                className={`border-b border-slate-200 last:border-b-0 dark:border-slate-800 ${
-                  isActive ? 'bg-slate-100/60 dark:bg-slate-900/60' : ''
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => handleStepChange(index)}
-                  disabled={!isStepUnlocked(index)}
-                  className={`flex w-full items-center gap-4 px-5 py-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 ${
-                    isActive
-                      ? 'text-slate-900 dark:text-slate-100'
-                      : 'text-slate-600 hover:bg-slate-100/80 dark:text-slate-400 dark:hover:bg-slate-800/60'
-                  } ${!isStepUnlocked(index) ? 'cursor-not-allowed opacity-50' : ''}`}
-                >
-                  <span
-                    className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-semibold ${
-                      isComplete
-                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:border-emerald-400 dark:text-emerald-300'
-                        : isActive
-                          ? 'border-sky-500 text-sky-600 dark:border-sky-400 dark:text-sky-300'
-                          : 'border-slate-300 text-slate-500 dark:border-slate-600 dark:text-slate-400'
-                    }`}
-                  >
-                    {stepNumber}
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold">{step.title}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{step.description}</p>
-                  </div>
-                </button>
-              </li>
-            )
-          })}
-          </ol>
+          <Stepper
+            steps={steps}
+            statuses={statuses}
+            activeStepIndex={activeStepIndex}
+            onStepSelect={goTo}
+            isStepUnlocked={isStepUnlocked}
+          />
 
         <div className="space-y-6">
           {ActiveStepComponent ? <ActiveStepComponent {...activeStepProps} /> : null}
@@ -451,7 +387,7 @@ export function GuidedCharacterLayout() {
           <div className="flex flex-col gap-4 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
             <button
               type="button"
-              onClick={handleBack}
+              onClick={previous}
               disabled={activeStepIndex === 0}
               className="inline-flex items-center justify-center rounded-full border border-slate-300 px-5 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
@@ -464,7 +400,7 @@ export function GuidedCharacterLayout() {
               )}
               <button
                 type="button"
-                onClick={handleNext}
+                onClick={next}
                 disabled={isLastStep || !currentStatus.complete}
                 className="inline-flex items-center justify-center rounded-full bg-sky-600 px-6 py-2 text-sm font-semibold text-white shadow transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700"
               >
