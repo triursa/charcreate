@@ -34,8 +34,26 @@ export function ClassLeveler() {
 
   const classLevelEntries = character.history
 
-  const subclassDecisionId = selectedClass ? `${selectedClass.id}-subclass-choice` : undefined
-  const subclassDecision = subclassDecisionId ? resolvedDecisions[subclassDecisionId] : undefined
+  if (availableClasses.length === 0 || !selectedClass) {
+    return (
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Class &amp; Level Progression</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Set your class and walk through levels to unlock features, proficiencies, and ASI/feat prompts.
+            </p>
+          </div>
+        </div>
+        <div className="mt-6 flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white/70 p-6 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-400">
+          {isLoading ? 'Loading classes…' : 'No classes available. Please try again later.'}
+        </div>
+      </section>
+    )
+  }
+
+  const subclassDecisionId = `${selectedClass.id}-subclass-choice`
+  const subclassDecision = resolvedDecisions[subclassDecisionId]
   const selectedSubclass =
     subclassDecision && subclassDecision.type === 'choose-subclass' ? subclassDecision.choice : undefined
 
