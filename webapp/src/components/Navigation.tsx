@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, Menu, X, Moon, Sun, Home, Scroll, Users, Shield, Book, Map, Zap, Award } from 'lucide-react'
+import { Search, Menu, X, Moon, Sun, Home, Scroll, Users, Shield, Book, Map, Zap, Award, Sparkles } from 'lucide-react'
 import { useTheme } from '@/app/providers'
 
 interface NavigationProps {
@@ -20,7 +20,8 @@ const categories = [
   { id: 'items', label: 'Items', icon: Scroll, description: 'Equipment, weapons, and magic items' },
   { id: 'backgrounds', label: 'Backgrounds', icon: Book, description: 'Character backgrounds' },
   { id: 'adventures', label: 'Adventures', icon: Map, description: 'Published adventures' },
-  { id: 'feats', label: 'Feats', icon: Award, description: 'Character feats and abilities' }
+  { id: 'feats', label: 'Feats', icon: Award, description: 'Character feats and abilities' },
+  { id: 'optionalfeatures', label: 'Optional Features', icon: Sparkles, description: 'Class variant features and options' }
 ]
 
 export function Navigation({ onCategorySelect, onSearch, onHomeSelect, currentCategory, searchQuery }: NavigationProps) {

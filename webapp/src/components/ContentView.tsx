@@ -44,6 +44,12 @@ const categoryConfig: Record<string, CategoryConfig> = {
     accentClass: "bg-violet-500",
     icon: Award
   },
+  optionalfeatures: {
+    title: "Optional Features",
+    description: "Explore variant class features, maneuvers, and modular character options.",
+    accentClass: "bg-purple-500",
+    icon: Sparkles
+  },
   search: {
     title: "Search Results",
     description: "See matching results from every compendium source in a single table.",

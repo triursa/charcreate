@@ -147,17 +147,26 @@ export async function getAllFeats() {
 }
 
 /**
+ * Get all optional features
+ */
+export async function getAllOptionalFeatures() {
+  const data = await loadDataFile('optionalfeatures.json')
+  return data?.optionalfeature || []
+}
+
+/**
  * Load all content types
  */
 export async function loadAllContent() {
-  const [spells, races, classes, items, backgrounds, adventures, feats] = await Promise.all([
+  const [spells, races, classes, items, backgrounds, adventures, feats, optionalfeatures] = await Promise.all([
     getAllSpells(),
     getAllRaces(),
     getAllClasses(),
     getAllItems(),
     getAllBackgrounds(),
     getAllAdventures(),
-    getAllFeats()
+    getAllFeats(),
+    getAllOptionalFeatures()
   ])
 
   return {
@@ -167,7 +176,8 @@ export async function loadAllContent() {
     items,
     backgrounds,
     adventures,
-    feats
+    feats,
+    optionalfeatures
   }
 }
 
@@ -176,7 +186,7 @@ export async function loadAllContent() {
  */
 export async function getContentStats() {
   const content = await loadAllContent()
-  
+
   return {
     spells: content.spells.length,
     races: content.races.length,
@@ -185,6 +195,7 @@ export async function getContentStats() {
     items: content.items.length,
     backgrounds: content.backgrounds.length,
     adventures: content.adventures.length,
-    feats: content.feats.length
+    feats: content.feats.length,
+    optionalfeatures: content.optionalfeatures.length
   }
 }
