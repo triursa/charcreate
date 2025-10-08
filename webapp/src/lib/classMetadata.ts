@@ -1,4 +1,9 @@
-import type { CatalogueClass, ClassDefinition, SubclassDefinition } from '../types/catalogue'
+import type {
+  CatalogueClass,
+  ClassDefinition,
+  OptionalFeatureProgressionEntry,
+  SubclassDefinition
+} from '../types/catalogue'
 
 type FeatureByLevel = ClassDefinition['featuresByLevel']
 
@@ -16,6 +21,7 @@ interface ClassMetadataEntry {
   subclassLevel: number
   featuresByLevel: FeatureByLevel
   asiLevels: number[]
+  optionalFeatureProgression?: OptionalFeatureProgressionEntry[]
 }
 
 type ClassMetadataMap = Record<string, ClassMetadataEntry>
@@ -288,6 +294,7 @@ export function mergeClassMetadata(classId: string, base: Partial<CatalogueClass
       subclassLevel: base.subclassLevel,
       featuresByLevel: base.featuresByLevel ?? {},
       asiLevels: base.asiLevels ?? [],
+      optionalFeatureProgression: base.optionalFeatureProgression ?? [],
       description: base.description,
       source: base.source,
       raw: base.raw
@@ -331,6 +338,10 @@ export function mergeClassMetadata(classId: string, base: Partial<CatalogueClass
     : metadata.featuresByLevel
 
   const normalizedAsiLevels = Array.isArray(base.asiLevels) && base.asiLevels.length > 0 ? base.asiLevels : metadata.asiLevels
+  const normalizedOptionalFeatureProgression =
+    Array.isArray(base.optionalFeatureProgression) && base.optionalFeatureProgression.length > 0
+      ? base.optionalFeatureProgression
+      : metadata.optionalFeatureProgression ?? []
 
   return {
     id: classId,
@@ -348,6 +359,7 @@ export function mergeClassMetadata(classId: string, base: Partial<CatalogueClass
     subclassLevel: normalizedSubclassLevel,
     featuresByLevel: normalizedFeatures ?? {},
     asiLevels: normalizedAsiLevels ?? [],
+    optionalFeatureProgression: normalizedOptionalFeatureProgression,
     description: base.description,
     source: base.source,
     raw: base.raw

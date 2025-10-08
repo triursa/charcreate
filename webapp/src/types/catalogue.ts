@@ -29,9 +29,26 @@ export interface ClassDefinition {
   asiLevels: number[]
 }
 
+export interface OptionalFeatureProgressionStep {
+  level: number
+  count?: number
+  known?: number
+  [key: string]: unknown
+}
+
+export interface OptionalFeatureProgressionEntry {
+  id: string
+  name?: string
+  featureTypes: string[]
+  progression: OptionalFeatureProgressionStep[]
+  source?: string
+  raw?: any
+}
+
 export interface CatalogueClass extends ClassDefinition {
   source?: string
   description?: string
+  optionalFeatureProgression?: OptionalFeatureProgressionEntry[]
   raw?: any
 }
 
