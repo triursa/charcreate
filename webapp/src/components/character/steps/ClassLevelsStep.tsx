@@ -33,12 +33,12 @@ export function ClassLevelsStep({
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Set Your Goal Level</h2>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+      <section className="rounded-3xl border border-slate-200/70 bg-white/80 p-8 shadow-xl backdrop-blur dark:border-slate-800/70 dark:bg-slate-900/60">
+        <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Set Your Goal Level</h2>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
           Choose the level you want to build towards, then use the progression controls below to reach it.
         </p>
-        <div className="mt-4 space-y-4">
+        <div className="mt-6 space-y-4">
           <div className="flex items-center gap-4">
             <input
               type="range"
@@ -62,9 +62,9 @@ export function ClassLevelsStep({
       <ClassLeveler />
 
       {pendingDecisionCount > 0 && (
-        <section className="rounded-2xl border border-blue-200 bg-white p-6 shadow-sm dark:border-blue-500/60 dark:bg-slate-900">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Resolve Pending Decisions</h3>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+        <section className="rounded-3xl border border-blue-200/70 bg-blue-50/70 p-6 shadow-lg backdrop-blur dark:border-blue-500/50 dark:bg-blue-500/10">
+          <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100">Resolve Pending Decisions</h3>
+          <p className="mt-1 text-sm text-blue-800/80 dark:text-blue-100/80">
             Leveling unlocked new class options. Finalize them here before moving on.
           </p>
           <div className="mt-4">
