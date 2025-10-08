@@ -1,7 +1,9 @@
 import fs from 'fs/promises'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import prisma from '../src/lib/prisma'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,6 +16,47 @@ async function importJson(file: string) {
 }
 
 async function main() {
+  // Quick hardcoded seed for ancestries
+  await prisma.race.createMany({
+    data: [
+      {
+        name: 'Human',
+        source: 'PHB',
+        speed: 30,
+        ability: JSON.stringify({ STR: 1, DEX: 1, CON: 1, INT: 1, WIS: 1, CHA: 1 }),
+        languageProficiencies: JSON.stringify(['Common', 'One extra language of your choice']),
+        entries: 'Versatile and ambitious, humans gain broad ability score increases and adapt quickly to any role.'
+      },
+      {
+        name: 'High Elf',
+        source: 'PHB',
+        speed: 30,
+        ability: JSON.stringify({ DEX: 2, INT: 1 }),
+        languageProficiencies: JSON.stringify(['Common', 'Elvish']),
+        entries: 'Graceful and keen-eyed, high elves combine natural dexterity with keen intellect and ancestral magic.'
+      }
+    ]
+  })
+
+  // Quick hardcoded seed for backgrounds
+  await prisma.background.createMany({
+    data: [
+      {
+        name: 'Acolyte',
+        source: 'PHB',
+        skillProficiencies: JSON.stringify(['Insight', 'Religion']),
+        languages: JSON.stringify(['Any', 'Any']),
+        feature: JSON.stringify({ name: 'Shelter of the Faithful', description: 'You command the respect of those who share your faith.' })
+      },
+      {
+        name: 'Criminal',
+        source: 'PHB',
+        skillProficiencies: JSON.stringify(['Deception', 'Stealth']),
+        toolProficiencies: JSON.stringify(['Thieves’ Tools', 'Gaming set']),
+        feature: JSON.stringify({ name: 'Criminal Contact', description: 'You have a reliable and trustworthy contact who acts as a liaison to a network of other criminals.' })
+      }
+    ]
+  })
   // Races
   const racesJson = await importJson('races.json')
   for (const race of racesJson.race || []) {

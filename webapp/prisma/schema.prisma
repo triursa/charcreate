@@ -35,6 +35,7 @@ model Item {
 model Background {
   id         Int      @id @default(autoincrement())
   name       String
+  source     String?
   entries    Json?
   skillProficiencies Json?
   toolProficiencies Json?
