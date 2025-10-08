@@ -1,6 +1,7 @@
 "use client"
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
 import { useTheme } from '@/app/providers'
 import { Moon, Sun } from 'lucide-react'
@@ -10,11 +11,13 @@ const navigation = [
   { href: '/charcreate', label: 'Character Creator' },
   { href: '/data', label: 'Data' },
   { href: '/admin', label: 'Admin' },
+  { href: '/documentation', label: 'Documentation' }
 ]
 
 export function SiteNav() {
   const { theme, toggleTheme } = useTheme()
   const isDarkMode = theme === 'dark'
+  const pathname = usePathname()
   const ThemeIcon = isDarkMode ? Sun : Moon
   const toggleLabel = isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'
 
@@ -31,15 +34,23 @@ export function SiteNav() {
           <span className="text-lg">CharCreate</span>
         </Link>
         <nav aria-label="Primary" className="flex flex-1 flex-wrap items-center justify-end gap-x-4 gap-y-2 text-sm font-medium sm:gap-x-6">
-          {navigation.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-md px-2 py-1 text-slate-700 transition hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-200 dark:hover:text-blue-300 dark:focus-visible:ring-offset-slate-900"
-            >
-              {item.label}
-            </Link>
-          ))}
+          {navigation.map((item) => {
+            const isActive = pathname === item.href
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={isActive ? 'page' : undefined}
+                className={`rounded-md px-2 py-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 ${
+                  isActive
+                    ? 'bg-blue-50 text-blue-700 dark:bg-slate-800 dark:text-blue-300'
+                    : 'text-slate-700 hover:text-blue-600 dark:text-slate-200 dark:hover:text-blue-300'
+                }`}
+              >
+                {item.label}
+              </Link>
+            )
+          })}
           <button
             type="button"
             onClick={toggleTheme}
