@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { beforeEach, test } from 'node:test'
 
-import type { AncestryRecord } from '../../src/components/character/AncestrySelector.js'
+import type { AncestryRecord } from '../../src/types/character-builder.js'
 import { __resetAncestryCacheForTests, useAncestries } from '../../src/hooks/useAncestries.js'
 import { type RenderHookController, renderHook } from '../utils/renderHook.js'
 

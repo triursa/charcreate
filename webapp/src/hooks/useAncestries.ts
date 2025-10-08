@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { AncestryRecord } from '@/components/character/AncestrySelector'
+import type { AncestryRecord } from '@/types/character-builder'
 
 interface UseAncestriesOptions {
   enabled?: boolean

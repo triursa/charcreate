@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { BackgroundRecord } from '@/components/character/BackgroundSelector'
+import type { BackgroundRecord } from '@/types/character-builder'
 
 interface UseBackgroundsOptions {
   enabled?: boolean

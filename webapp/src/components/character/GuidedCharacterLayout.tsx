@@ -2,14 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import {
-  AncestrySelector,
-  type AncestryRecord,
-  getAncestrySummary
-} from '@/components/character/AncestrySelector'
+import { AncestrySelector, getAncestrySummary } from '@/components/character/AncestrySelector'
 import {
   BackgroundSelector,
-  type BackgroundRecord,
   extractBackgroundValues,
   getBackgroundSummary
 } from '@/components/character/BackgroundSelector'
@@ -33,6 +28,7 @@ import {
 } from '@/components/character/SelectionModal'
 
 import type { ComponentType } from 'react'
+import type { AncestryRecord, BackgroundRecord } from '@/types/character-builder'
 
 interface GuidedCharacterStepDefinition extends StepDefinition {
   component: ComponentType<any>
@@ -79,7 +75,7 @@ export function GuidedCharacterLayout() {
   }, [ancestries])
   const selectedAncestry: AncestryRecord | undefined = useMemo(() => {
     if (state.ancestryData) {
-      return state.ancestryData as AncestryRecord
+      return state.ancestryData
     }
     if (!state.ancestryId) {
       return undefined
@@ -92,7 +88,7 @@ export function GuidedCharacterLayout() {
   }, [backgrounds])
   const selectedBackground: BackgroundRecord | undefined = useMemo(() => {
     if (state.backgroundData) {
-      return state.backgroundData as BackgroundRecord
+      return state.backgroundData
     }
     if (!state.backgroundId) {
       return undefined

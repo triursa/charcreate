@@ -2,9 +2,11 @@ import { abilityList, abilityMod, proficiencyBonus } from '@/lib/abilities'
 import { ancestryMap } from '@/data/ancestries'
 import { classMap } from '@/data/classes'
 import { featMap } from '@/data/feats'
+import type { CharacterBuilderState, ResolvedDecisionValue } from '@/state/character-builder'
+import type { AbilityScoreEntry, AncestryRecord, BackgroundRecord, EntryLike, StructuredEntry } from '@/types/character-builder'
 import type { Character, Decision, FeatureInstance, LevelSnapshot } from '@/types/character'
 import type { Ability, Skill } from '@/types/character'
-import type { CharacterBuilderState, ResolvedDecisionValue } from '@/state/character-builder'
+import { skillNames } from '@/types/character'
 
 interface BuildResult {
   character: Character
@@ -37,6 +39,181 @@ const averageHitDie: Record<number, number> = {
   8: 5,
   10: 6,
   12: 7
+}
+
+const skillNameSet = new Set<string>(skillNames)
+
+function isSkillName(value: string): value is Skill {
+  return skillNameSet.has(value)
+}
+
+function isStructuredEntry(value: unknown): value is StructuredEntry {
+  return typeof value === 'object' && value !== null
+}
+
+function isAbilityScoreEntry(value: unknown): value is AbilityScoreEntry {
+  return isStructuredEntry(value)
+}
+
+function extractAbilityBonuses(record: AncestryRecord): Record<string, number> {
+  const bonuses: Record<string, number> = {}
+
+  const applyEntry = (entry: AbilityScoreEntry) => {
+    Object.entries(entry).forEach(([ability, value]) => {
+      if (ability === 'choose' || ability === 'entries' || ability === 'from') {
+        return
+      }
+      if (typeof value === 'number') {
+        bonuses[ability] = (bonuses[ability] ?? 0) + value
+      }
+    })
+  }
+
+  const ability = record.ability
+  if (Array.isArray(ability)) {
+    ability.forEach((entry) => {
+      if (isAbilityScoreEntry(entry)) {
+        applyEntry(entry)
+      }
+    })
+  } else if (isAbilityScoreEntry(ability)) {
+    applyEntry(ability)
+  }
+
+  if (record.abilityBonuses) {
+    Object.entries(record.abilityBonuses).forEach(([ability, value]) => {
+      if (typeof value === 'number') {
+        bonuses[ability] = (bonuses[ability] ?? 0) + value
+      }
+    })
+  }
+
+  return bonuses
+}
+
+function collectGrantedStrings(value: EntryLike | undefined): string[] {
+  if (!value) return []
+  if (typeof value === 'string') return [value]
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => collectGrantedStrings(entry)).filter(Boolean)
+  }
+  if (isStructuredEntry(value)) {
+    const results: string[] = []
+    if (value.entries) {
+      results.push(...collectGrantedStrings(value.entries))
+    }
+    Object.entries(value).forEach(([key, nested]) => {
+      if (key === 'choose' || key === 'from' || key === 'entries') {
+        return
+      }
+      if (typeof nested === 'string') {
+        results.push(nested)
+      } else if (Array.isArray(nested)) {
+        nested.forEach((item) => {
+          if (typeof item === 'string') {
+            results.push(item)
+          }
+        })
+      } else if (isStructuredEntry(nested)) {
+        results.push(...collectGrantedStrings(nested as EntryLike))
+      }
+    })
+    return results
+  }
+  return []
+}
+
+interface ChoicePrompt {
+  options: string[]
+  count: number
+}
+
+function collectChoicePrompts(value: EntryLike | undefined): ChoicePrompt[] {
+  if (!value) return []
+  if (typeof value === 'string') return []
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => collectChoicePrompts(entry))
+  }
+  if (isStructuredEntry(value)) {
+    const results: ChoicePrompt[] = []
+    const choose = value.choose
+    const options = Array.isArray(choose?.from)
+      ? choose.from.filter((item): item is string => typeof item === 'string')
+      : []
+    if (choose && options.length > 0) {
+      results.push({ options, count: choose.count ?? 1 })
+    }
+    if (value.entries) {
+      results.push(...collectChoicePrompts(value.entries))
+    }
+    Object.entries(value).forEach(([key, nested]) => {
+      if (key === 'choose' || key === 'from' || key === 'entries') {
+        return
+      }
+      if (Array.isArray(nested) || isStructuredEntry(nested)) {
+        results.push(...collectChoicePrompts(nested as EntryLike))
+      }
+    })
+    return results
+  }
+  return []
+}
+
+function normalizeFeature(feature: unknown): FeatureInstance | null {
+  if (!feature || typeof feature !== 'object') {
+    return null
+  }
+
+  const { id, name } = feature as { id?: unknown; name?: unknown }
+  if (typeof id !== 'string' || typeof name !== 'string') {
+    return null
+  }
+
+  const sourceValue = (feature as { source?: unknown }).source
+  const source = Array.isArray(sourceValue)
+    ? sourceValue.filter((entry): entry is string => typeof entry === 'string')
+    : []
+
+  const description = typeof (feature as { description?: unknown }).description === 'string'
+    ? ((feature as { description?: string }).description)
+    : undefined
+
+  const payloadValue = (feature as { payload?: unknown }).payload
+  const payload =
+    payloadValue && typeof payloadValue === 'object'
+      ? (payloadValue as Record<string, unknown>)
+      : undefined
+
+  const mergeStrategyValue = (feature as { mergeStrategy?: unknown }).mergeStrategy
+  const mergeStrategy =
+    mergeStrategyValue === 'max' ||
+    mergeStrategyValue === 'sum' ||
+    mergeStrategyValue === 'set' ||
+    mergeStrategyValue === 'custom'
+      ? mergeStrategyValue
+      : undefined
+
+  return {
+    id,
+    name,
+    source,
+    description,
+    payload,
+    mergeStrategy
+  }
+}
+
+function extractSpeedValue(speed: AncestryRecord['speed']): number | undefined {
+  if (!speed) {
+    return undefined
+  }
+  if (typeof speed === 'number') {
+    return speed
+  }
+  if (typeof speed.walk === 'number') {
+    return speed.walk
+  }
+  return undefined
 }
 
 function emptyAbilityRecord(): Record<Ability, number> {
@@ -148,35 +325,22 @@ function applyFeatEffects(
 }
 
 export function buildCharacter(state: CharacterBuilderState): BuildResult {
-  // Use ancestryData from state if present, else fallback to ancestryMap
-  const ancestry = state.ancestryData ?? (state.ancestryId ? ancestryMap[state.ancestryId] : undefined)
-  const background = state.backgroundData
+  const ancestry: AncestryRecord | undefined =
+    state.ancestryData ?? (state.ancestryId ? (ancestryMap[state.ancestryId] as unknown as AncestryRecord | undefined) : undefined)
+  const background: BackgroundRecord | undefined = state.backgroundData
   const cls = state.classData ?? (state.classId ? classMap[state.classId] : undefined)
 
   const racialBonuses = emptyAbilityRecord()
   if (ancestry) {
-    // Support both static and DB race formats
-    let abilityBonuses: Record<string, number> = {}
-    if (Array.isArray(ancestry.ability)) {
-      ancestry.ability.forEach((obj: any) => {
-        Object.entries(obj).forEach(([ability, value]) => {
-          if (ability !== 'choose' && typeof value === 'number') {
-            abilityBonuses[ability] = value
-          }
-        })
-      })
-    } else if (typeof ancestry.ability === 'object' && ancestry.ability !== null) {
-      Object.entries(ancestry.ability).forEach(([ability, value]) => {
-        if (typeof value === 'number') abilityBonuses[ability] = value
-      })
-    } else if (typeof ancestry.abilityBonuses === 'object' && ancestry.abilityBonuses !== null) {
-      Object.entries(ancestry.abilityBonuses).forEach(([ability, value]) => {
-        if (typeof value === 'number') abilityBonuses[ability] = value
-      })
-    }
+    const abilityBonuses = extractAbilityBonuses(ancestry)
     for (const [ability, bonus] of Object.entries(abilityBonuses)) {
+      if (typeof bonus !== 'number') {
+        continue
+      }
       const key = ability.toUpperCase() as Ability
-      racialBonuses[key] = (racialBonuses[key] ?? 0) + (typeof bonus === 'number' ? bonus : 0)
+      if (abilityList.includes(key)) {
+        racialBonuses[key] = (racialBonuses[key] ?? 0) + bonus
+      }
     }
   }
 
@@ -198,105 +362,111 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
   const history: LevelSnapshot[] = []
 
   if (ancestry) {
-    // Languages
-    if (Array.isArray(ancestry.languages)) {
-      ancestry.languages.forEach((language: any) => {
-        if (typeof language === 'string') languages.add(language)
-      })
-    } else if (Array.isArray(ancestry.languageProficiencies)) {
-      ancestry.languageProficiencies.forEach((language: any) => {
-        if (typeof language === 'string') languages.add(language)
-      })
-    }
-    // Features
+    collectGrantedStrings(ancestry.languages).forEach((language) => {
+      languages.add(language)
+    })
+    collectGrantedStrings(ancestry.languageProficiencies).forEach((language) => {
+      languages.add(language)
+    })
+
     if (Array.isArray(ancestry.features)) {
-      ancestry.features.forEach((feature: any) => {
-        if (feature && feature.id) features.push({ ...feature, source: Array.isArray(feature.source) ? [...feature.source] : [] })
+      ancestry.features.forEach((feature) => {
+        const normalized = normalizeFeature(feature)
+        if (normalized) {
+          features.push({ ...normalized, source: [...normalized.source] })
+        }
       })
     }
-    // Skill Proficiencies
+
     if (Array.isArray(ancestry.skillProficiencies)) {
-      ancestry.skillProficiencies.forEach((skill: any) => {
-        if (typeof skill === 'string') skillProficiencies.add(skill as any)
+      ancestry.skillProficiencies.forEach((entry) => {
+        if (typeof entry === 'string') {
+          if (isSkillName(entry)) {
+            skillProficiencies.add(entry)
+          }
+          return
+        }
+
+        collectGrantedStrings(entry).forEach((skillName) => {
+          if (isSkillName(skillName)) {
+            skillProficiencies.add(skillName)
+          }
+        })
       })
     }
   }
 
   // Apply background bonuses and features
   if (background) {
-    // Skills
-    if (Array.isArray(background.skillProficiencies)) {
-      background.skillProficiencies.forEach((skill: any) => {
-        if (typeof skill === 'string') {
-          skillProficiencies.add(skill as any) // TODO: Fix typing
-        }
-      })
-    }
-    // Tools
-    if (Array.isArray(background.toolProficiencies)) {
-      background.toolProficiencies.forEach((tool: any) => {
-        if (typeof tool === 'string') toolProficiencies.add(tool)
-      })
-    }
-    // Languages
-    if (Array.isArray(background.languages)) {
-      background.languages.forEach((lang: any) => {
-        if (typeof lang === 'string') languages.add(lang)
-      })
-    }
-    // Feature
+    collectGrantedStrings(background.skillProficiencies).forEach((skillName) => {
+      if (isSkillName(skillName)) {
+        skillProficiencies.add(skillName)
+      }
+    })
+
+    collectGrantedStrings(background.toolProficiencies).forEach((tool) => {
+      toolProficiencies.add(tool)
+    })
+
+    collectGrantedStrings(background.languages).forEach((lang) => {
+      languages.add(lang)
+    })
+
     if (background.feature) {
       if (Array.isArray(background.feature)) {
-        background.feature.forEach((feature: any) => {
-          if (feature && feature.id) features.push({ ...feature, source: Array.isArray(feature.source) ? [...feature.source] : [] })
+        background.feature.forEach((feature) => {
+          const normalized = normalizeFeature(feature)
+          if (normalized) {
+            features.push({ ...normalized, source: [...normalized.source] })
+          }
         })
-      } else if (background.feature && background.feature.id) {
-        features.push({ ...background.feature, source: Array.isArray(background.feature.source) ? [...background.feature.source] : [] })
+      } else {
+        const normalized = normalizeFeature(background.feature)
+        if (normalized) {
+          features.push({ ...normalized, source: [...normalized.source] })
+        }
       }
     }
-    // Decision queue for skills/languages/tools
-    if (background.skillProficiencies && Array.isArray(background.skillProficiencies)) {
-      background.skillProficiencies.forEach((skill: any) => {
-        if (skill.choose && Array.isArray(skill.choose.from)) {
-          pendingDecisions.push({
-            id: `background-skill-${background.id}`,
-            type: 'choose-skill',
-            options: skill.choose.from,
-            min: skill.choose.count ?? 1,
-            max: skill.choose.count ?? 1,
-            label: `Choose ${skill.choose.count ?? 1} background skill(s)`
-          })
-        }
-      })
-    }
-    if (background.languages && Array.isArray(background.languages)) {
-      background.languages.forEach((lang: any) => {
-        if (lang.choose && Array.isArray(lang.choose.from)) {
-          pendingDecisions.push({
-            id: `background-language-${background.id}`,
-            type: 'choose-language',
-            options: lang.choose.from,
-            min: lang.choose.count ?? 1,
-            max: lang.choose.count ?? 1,
-            label: `Choose ${lang.choose.count ?? 1} background language(s)`
-          })
-        }
-      })
-    }
-    if (background.toolProficiencies && Array.isArray(background.toolProficiencies)) {
-      background.toolProficiencies.forEach((tool: any) => {
-        if (tool.choose && Array.isArray(tool.choose.from)) {
-          pendingDecisions.push({
-            id: `background-tool-${background.id}`,
-            type: 'choose-tool',
-            options: tool.choose.from,
-            min: tool.choose.count ?? 1,
-            max: tool.choose.count ?? 1,
-            label: `Choose ${tool.choose.count ?? 1} background tool(s)`
-          })
-        }
-      })
-    }
+
+    collectChoicePrompts(background.skillProficiencies).forEach((prompt, index) => {
+      const options = prompt.options.filter(isSkillName)
+      if (options.length > 0) {
+        pendingDecisions.push({
+          id: `background-skill-${background.id}-${index}`,
+          type: 'choose-skill',
+          options,
+          min: prompt.count,
+          max: prompt.count,
+          label: `Choose ${prompt.count} background skill(s)`
+        })
+      }
+    })
+
+    collectChoicePrompts(background.languages).forEach((prompt, index) => {
+      if (prompt.options.length > 0) {
+        pendingDecisions.push({
+          id: `background-language-${background.id}-${index}`,
+          type: 'choose-language',
+          options: prompt.options,
+          min: prompt.count,
+          max: prompt.count,
+          label: `Choose ${prompt.count} background language(s)`
+        })
+      }
+    })
+
+    collectChoicePrompts(background.toolProficiencies).forEach((prompt, index) => {
+      if (prompt.options.length > 0) {
+        pendingDecisions.push({
+          id: `background-tool-${background.id}-${index}`,
+          type: 'choose-tool',
+          options: prompt.options,
+          min: prompt.count,
+          max: prompt.count,
+          label: `Choose ${prompt.count} background tool(s)`
+        })
+      }
+    })
   }
 
   let hp = 0
@@ -474,7 +644,7 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
     profBonus: proficiency,
     hp,
     ac,
-    speed: ancestry?.speed ?? 30,
+    speed: extractSpeedValue(ancestry?.speed) ?? 30,
     passivePerception,
     saves: {
       proficient: cls ? [...cls.savingThrows] : []
