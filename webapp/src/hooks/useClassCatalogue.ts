@@ -389,9 +389,17 @@ function parseOptionalFeatureProgression(
         : []
 
     const progressionValue = (entry as { progression?: unknown }).progression
+    type NormalizedProgressionStep = {
+      level: number
+      count: number | undefined
+      known: number | undefined
+      raw: unknown
+      index: number
+    }
+
     const progression = Array.isArray(progressionValue)
       ? progressionValue
-          .map((step, stepIndex) => {
+          .map((step, stepIndex): NormalizedProgressionStep | undefined => {
             if (typeof step !== 'object' || step === null) {
               return undefined
             }
@@ -412,7 +420,7 @@ function parseOptionalFeatureProgression(
               index: stepIndex
             }
           })
-          .filter((step): step is { level: number; count?: number; known?: number; raw: unknown; index: number } => Boolean(step))
+          .filter((step): step is NormalizedProgressionStep => step !== undefined)
       : []
 
     if (featureTypes.length === 0 || progression.length === 0) {
