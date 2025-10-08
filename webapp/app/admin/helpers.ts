@@ -3,6 +3,53 @@ import { prisma } from '@/lib/prisma'
 
 export type DuplicateGroup = [string, Spell[]]
 
+export const ADMIN_MODELS = [
+  { key: 'spell', label: 'Spells', singularLabel: 'Spell', prismaModel: 'Spell' },
+  { key: 'race', label: 'Races', singularLabel: 'Race', prismaModel: 'Race' },
+  { key: 'item', label: 'Items', singularLabel: 'Item', prismaModel: 'Item' },
+  { key: 'background', label: 'Backgrounds', singularLabel: 'Background', prismaModel: 'Background' },
+  { key: 'feat', label: 'Feats', singularLabel: 'Feat', prismaModel: 'Feat' },
+  { key: 'class', label: 'Classes', singularLabel: 'Class', prismaModel: 'Class' },
+] as const
+
+export type AdminModelKey = typeof ADMIN_MODELS[number]['key']
+
+const ADMIN_DELEGATE_MAP: Record<AdminModelKey, (client: PrismaClient) => any> = {
+  spell: client => client.spell,
+  race: client => client.race,
+  item: client => client.item,
+  background: client => client.background,
+  feat: client => client.feat,
+  class: client => client.class,
+}
+
+const ADMIN_COLUMN_CACHE = new Map<AdminModelKey, string[]>()
+
+export function normalizeAdminModel(model: string | null | undefined): AdminModelKey {
+  if (!model) return 'spell'
+  const match = ADMIN_MODELS.find(option => option.key === model)
+  return match ? match.key : 'spell'
+}
+
+export function getAdminDelegate(model: AdminModelKey, client: PrismaClient = prisma) {
+  return ADMIN_DELEGATE_MAP[model](client)
+}
+
+export function getAdminColumns(model: AdminModelKey): string[] {
+  const cached = ADMIN_COLUMN_CACHE.get(model)
+  if (cached) return cached
+
+  const prismaModelName = ADMIN_MODELS.find(option => option.key === model)?.prismaModel
+  if (!prismaModelName) return []
+
+  const prismaModel = Prisma.dmmf.datamodel.models.find(entry => entry.name === prismaModelName)
+  if (!prismaModel) return []
+
+  const columns = prismaModel.fields.map(field => field.name)
+  ADMIN_COLUMN_CACHE.set(model, columns)
+  return columns
+}
+
 export async function loadSpellDuplicates(client: PrismaClient = prisma): Promise<DuplicateGroup[]> {
   const allEntries = await client.spell.findMany()
   const grouped: Record<string, Spell[]> = {}
@@ -34,10 +81,19 @@ export function parseIdParam(value: string | null): ParseIdResult {
   return { ok: true, id }
 }
 
-export function buildAdminRedirectUrl(baseUrl: URL, status: 'success' | 'error', message: string) {
+export function buildAdminRedirectUrl(
+  baseUrl: URL,
+  status: 'success' | 'error',
+  message: string,
+  extraParams: Record<string, string | undefined> = {},
+) {
   const url = new URL('/admin', baseUrl.origin)
   url.searchParams.set('status', status)
   url.searchParams.set('message', message)
+  for (const [key, value] of Object.entries(extraParams)) {
+    if (!value) continue
+    url.searchParams.set(key, value)
+  }
   return url
 }
 

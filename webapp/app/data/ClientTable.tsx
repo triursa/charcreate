@@ -1,7 +1,13 @@
 "use client"
 import { useState, type ReactNode } from 'react'
 
-function DataTable({ rows, columns, onRowClick }: { rows: any[], columns: string[], onRowClick: (row: any) => void }) {
+type DataTableProps = {
+  rows: any[]
+  columns: string[]
+  onRowClick: (row: any) => void
+}
+
+function DataTable({ rows, columns, onRowClick }: DataTableProps) {
   return (
     <div className="overflow-x-auto rounded border">
       <table className="min-w-full divide-y">
@@ -166,7 +172,13 @@ function formatSpell(entry: any) {
   )
 }
 
-function EntryModal({ entry, onClose }: { entry: any, onClose: () => void }) {
+type EntryModalProps = {
+  entry: any
+  onClose: () => void
+  renderActions?: (entry: any) => ReactNode
+}
+
+function EntryModal({ entry, onClose, renderActions }: EntryModalProps) {
   if (!entry) return null
   // Only format spells for now, fallback to generic for others
   const isSpell = entry.level !== undefined && entry.school !== undefined
@@ -186,16 +198,27 @@ function EntryModal({ entry, onClose }: { entry: any, onClose: () => void }) {
             ))}
           </div>
         )}
+        {renderActions && (
+          <div className="mt-6 flex flex-wrap justify-end gap-2">
+            {renderActions(entry)}
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-export default function ClientTable({ rows, columns }: { rows: any[], columns: string[] }) {
+type ClientTableProps = {
+  rows: any[]
+  columns: string[]
+  renderActions?: (entry: any) => ReactNode
+}
+
+export default function ClientTable({ rows, columns, renderActions }: ClientTableProps) {
   const [modal, setModal] = useState<any>(null)
   return <>
     <DataTable rows={rows} columns={columns} onRowClick={setModal} />
-    {modal && <EntryModal entry={modal} onClose={() => setModal(null)} />}
+    {modal && <EntryModal entry={modal} onClose={() => setModal(null)} renderActions={renderActions} />}
   </>
 }
 

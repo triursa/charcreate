@@ -1,14 +1,22 @@
-import dynamic from 'next/dynamic'
-import { loadSpellDuplicates } from './helpers'
+import AdminTableManager from './AdminTableManager'
+import { ADMIN_MODELS, getAdminColumns, getAdminDelegate, normalizeAdminModel } from './helpers'
 
-const AdminDuplicates = dynamic(() => import('./AdminDuplicates'), { ssr: false })
+type SearchParams = { [key: string]: string | string[] | undefined }
 
-export default async function AdminPage() {
-  const duplicates = await loadSpellDuplicates()
+export default async function AdminPage({ searchParams }: { searchParams: SearchParams }) {
+  const rawModelParam = searchParams.model
+  const model = normalizeAdminModel(Array.isArray(rawModelParam) ? rawModelParam[0] : rawModelParam)
+  const delegate = getAdminDelegate(model)
+
+  const rows = await delegate.findMany({
+    orderBy: { name: 'asc' },
+  })
+
+  const columns = getAdminColumns(model)
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">
-      <AdminDuplicates duplicates={duplicates} />
+      <AdminTableManager model={model} rows={rows} columns={columns} models={ADMIN_MODELS} />
     </div>
   )
 }

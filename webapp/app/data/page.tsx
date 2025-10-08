@@ -1,18 +1,11 @@
 
-import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { ADMIN_MODELS, getAdminColumns, getAdminDelegate, normalizeAdminModel } from '../admin/helpers'
 const ClientTable = dynamic(() => import('./ClientTable'), { ssr: false })
 
 const PAGE_SIZE = 20
-const MODELS = [
-  { key: 'spell', label: 'Spells' },
-  { key: 'race', label: 'Races' },
-  { key: 'item', label: 'Items' },
-  { key: 'background', label: 'Backgrounds' },
-  { key: 'feat', label: 'Feats' },
-  { key: 'class', label: 'Classes' },
-]
+const MODELS = ADMIN_MODELS.map(({ key, label }) => ({ key, label }))
 
 type SearchParams = {
   model?: string
@@ -20,24 +13,13 @@ type SearchParams = {
   q?: string
 }
 
-function getDelegate(model: string | undefined) {
-  switch (model) {
-    case 'spell': return prisma.spell
-    case 'race': return prisma.race
-    case 'item': return prisma.item
-    case 'background': return prisma.background
-    case 'feat': return prisma.feat
-    case 'class': return prisma.class
-    default: return prisma.spell
-  }
-}
-
 export default async function DataPage({ searchParams }: { searchParams: SearchParams }) {
-  const model = searchParams.model ?? 'spell'
+  const rawModel = searchParams.model
+  const model = normalizeAdminModel(rawModel)
   const page = Math.max(1, parseInt(searchParams.page ?? '1', 10) || 1)
   const q = (searchParams.q ?? '').trim()
 
-  const delegate = getDelegate(model)
+  const delegate = getAdminDelegate(model)
 
   const where: any = q
     ? { name: { contains: q, mode: 'insensitive' } }
@@ -51,18 +33,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
     skip: (page - 1) * PAGE_SIZE,
   })
 
-  function getColumns(model: string | undefined) {
-    switch (model) {
-      case 'spell': return ['name', 'level', 'school']
-      case 'race': return ['name', 'source']
-      case 'item': return ['name', 'type', 'rarity', 'value', 'weight']
-      case 'background': return ['name']
-      case 'feat': return ['name']
-      case 'class': return ['name', 'hitDice']
-      default: return ['name']
-    }
-  }
-  const columns = getColumns(model)
+  const columns = getAdminColumns(model)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const makeHref = (p: number) => {
