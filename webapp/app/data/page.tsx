@@ -1,51 +1,257 @@
 
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+
 import { ADMIN_MODELS, normalizeAdminModel } from '../admin/models'
 import { getAdminColumns, getAdminDelegate } from '../admin/helpers'
-const ClientTable = dynamic(() => import('./ClientTable'), { ssr: false })
+
+const DataBrowserClient = dynamic(() => import('./DataBrowserClient'), { ssr: false })
 
 const PAGE_SIZE = 20
 const MODELS = ADMIN_MODELS.map(({ key, label }) => ({ key, label }))
 
-type SearchParams = {
-  model?: string
-  page?: string
-  q?: string
+type RawSearchParams = { [key: string]: string | string[] | undefined }
+
+type FilterState = {
+  trait: string[]
+  origin: string[]
+  source: string[]
+  tag: string[]
 }
 
-export default async function DataPage({ searchParams }: { searchParams: SearchParams }) {
-  const rawModel = searchParams.model
+type FilterOptions = FilterState
+
+const DEFAULT_FILTER_STATE: FilterState = {
+  trait: [],
+  origin: [],
+  source: [],
+  tag: [],
+}
+
+const SORT_FALLBACK = 'name:asc'
+
+function parseMultiParam(value: string | string[] | undefined): string[] {
+  if (!value) return []
+  const normalized = Array.isArray(value) ? value : value.split(',')
+  const flat = normalized
+    .flatMap(entry => entry.split(','))
+    .map(entry => entry.trim())
+    .filter(entry => entry.length > 0)
+  return Array.from(new Set(flat))
+}
+
+type SortField = 'name' | 'source' | 'popularity' | 'origin'
+type SortDirection = 'asc' | 'desc'
+
+function parseSortParam(raw: string | undefined): { field: SortField; direction: SortDirection; value: string } {
+  if (!raw) {
+    return { field: 'name', direction: 'asc', value: SORT_FALLBACK }
+  }
+
+  const [fieldPart, directionPart] = raw.split(':')
+  const field = (['name', 'source', 'popularity', 'origin'] as SortField[]).includes(fieldPart as SortField)
+    ? (fieldPart as SortField)
+    : 'name'
+  const direction = directionPart === 'desc' ? 'desc' : 'asc'
+  return { field, direction, value: `${field}:${direction}` }
+}
+
+function buildJsonArrayCondition(field: string, value: string) {
+  return {
+    [field]: {
+      path: '$',
+      array_contains: value,
+    },
+  }
+}
+
+function buildStringMatchCondition(field: string, values: string[]) {
+  return {
+    OR: values.map(value => ({ [field]: value })),
+  }
+}
+
+async function loadFilterOptions(delegate: any, columnSet: Set<string>): Promise<FilterOptions> {
+  const selection: Record<string, boolean> = {}
+
+  if (columnSet.has('traitTags')) selection.traitTags = true
+  if (columnSet.has('origin')) selection.origin = true
+  if (columnSet.has('source')) selection.source = true
+  if (columnSet.has('tags')) selection.tags = true
+  if (columnSet.has('miscTags')) selection.miscTags = true
+  if (columnSet.has('areaTags')) selection.areaTags = true
+  if (columnSet.has('featureType')) selection.featureType = true
+  if (columnSet.has('skillProficiencies')) selection.skillProficiencies = true
+  if (columnSet.has('damageInflict')) selection.damageInflict = true
+  if (columnSet.has('damageResist')) selection.damageResist = true
+  if (columnSet.has('damageImmune')) selection.damageImmune = true
+  if (columnSet.has('damageVulnerable')) selection.damageVulnerable = true
+
+  if (Object.keys(selection).length === 0) {
+    return DEFAULT_FILTER_STATE
+  }
+
+  const records: any[] = await delegate.findMany({ select: selection })
+
+  const traitSet = new Set<string>()
+  const originSet = new Set<string>()
+  const sourceSet = new Set<string>()
+  const tagSet = new Set<string>()
+
+  const addFromJson = (value: unknown, target: Set<string>) => {
+    if (!value) return
+    if (Array.isArray(value)) {
+      value.filter((entry): entry is string => typeof entry === 'string').forEach(entry => target.add(entry))
+      return
+    }
+    if (typeof value === 'string') {
+      target.add(value)
+    }
+  }
+
+  for (const record of records) {
+    if ('traitTags' in record) {
+      addFromJson(record.traitTags, traitSet)
+      addFromJson(record.traitTags, tagSet)
+    }
+    if ('featureType' in record) {
+      addFromJson(record.featureType, traitSet)
+    }
+    if ('skillProficiencies' in record) {
+      addFromJson(record.skillProficiencies, traitSet)
+    }
+    if ('origin' in record && typeof record.origin === 'string') {
+      originSet.add(record.origin)
+    }
+    if ('source' in record && typeof record.source === 'string') {
+      sourceSet.add(record.source)
+    }
+    if ('tags' in record) addFromJson(record.tags, tagSet)
+    if ('miscTags' in record) addFromJson(record.miscTags, tagSet)
+    if ('areaTags' in record) addFromJson(record.areaTags, tagSet)
+    if ('damageInflict' in record) addFromJson(record.damageInflict, tagSet)
+    if ('damageResist' in record) addFromJson(record.damageResist, tagSet)
+    if ('damageImmune' in record) addFromJson(record.damageImmune, tagSet)
+    if ('damageVulnerable' in record) addFromJson(record.damageVulnerable, tagSet)
+  }
+
+  const toSortedArray = (set: Set<string>) => Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b))
+
+  return {
+    trait: toSortedArray(traitSet),
+    origin: toSortedArray(originSet),
+    source: toSortedArray(sourceSet),
+    tag: toSortedArray(tagSet),
+  }
+}
+
+export default async function DataPage({ searchParams }: { searchParams: RawSearchParams }) {
+  const rawModel = Array.isArray(searchParams.model) ? searchParams.model[0] : searchParams.model
   const model = normalizeAdminModel(rawModel)
-  const page = Math.max(1, parseInt(searchParams.page ?? '1', 10) || 1)
-  const q = (searchParams.q ?? '').trim()
+  const pageParam = Array.isArray(searchParams.page) ? searchParams.page[0] : searchParams.page
+  const page = Math.max(1, parseInt(pageParam ?? '1', 10) || 1)
+  const qParam = Array.isArray(searchParams.q) ? searchParams.q[0] : searchParams.q
+  const q = (qParam ?? '').trim()
+
+  const selectedFilters: FilterState = {
+    trait: parseMultiParam(searchParams.trait),
+    origin: parseMultiParam(searchParams.origin),
+    source: parseMultiParam(searchParams.source),
+    tag: parseMultiParam(searchParams.tag),
+  }
+
+  const sortParamRaw = Array.isArray(searchParams.sort) ? searchParams.sort[0] : searchParams.sort
+  const parsedSort = parseSortParam(sortParamRaw)
 
   const delegate = getAdminDelegate(model)
+  const columns = getAdminColumns(model)
+  const columnSet = new Set(columns)
 
-  const where: any = q
-    ? { name: { contains: q, mode: 'insensitive' } }
-    : undefined
+  const whereClauses: any[] = []
 
-  const total = await delegate.count({ where })
+  if (q) {
+    whereClauses.push({ name: { contains: q, mode: 'insensitive' } })
+  }
+
+  if (selectedFilters.trait.length) {
+    const traitFields = ['traitTags', 'traits', 'featureType', 'skillProficiencies'].filter(field => columnSet.has(field))
+    if (traitFields.length) {
+      whereClauses.push({
+        OR: selectedFilters.trait.map(value => ({
+          OR: traitFields.map(field => buildJsonArrayCondition(field, value)),
+        })),
+      })
+    }
+  }
+
+  if (selectedFilters.origin.length) {
+    const originField = columnSet.has('origin') ? 'origin' : columnSet.has('source') ? 'source' : null
+    if (originField) {
+      whereClauses.push(buildStringMatchCondition(originField, selectedFilters.origin))
+    }
+  }
+
+  if (selectedFilters.source.length && columnSet.has('source')) {
+    whereClauses.push(buildStringMatchCondition('source', selectedFilters.source))
+  }
+
+  if (selectedFilters.tag.length) {
+    const tagFields = [
+      'tags',
+      'miscTags',
+      'areaTags',
+      'damageInflict',
+      'damageResist',
+      'damageImmune',
+      'damageVulnerable',
+      'traitTags',
+    ].filter(field => columnSet.has(field))
+    if (tagFields.length) {
+      whereClauses.push({
+        OR: selectedFilters.tag.map(value => ({
+          OR: tagFields.map(field => buildJsonArrayCondition(field, value)),
+        })),
+      })
+    }
+  }
+
+  const where = whereClauses.length ? { AND: whereClauses } : undefined
+
+  const orderByEntries: any[] = []
+  const requestedSortField = parsedSort.field === 'origin' && !columnSet.has('origin') && columnSet.has('source')
+    ? 'source'
+    : parsedSort.field
+
+  if (requestedSortField === 'source' && columnSet.has('source')) {
+    orderByEntries.push({ source: parsedSort.direction })
+  } else if (requestedSortField === 'origin' && columnSet.has('origin')) {
+    orderByEntries.push({ origin: parsedSort.direction })
+  } else if (requestedSortField === 'popularity' && columnSet.has('popularity')) {
+    orderByEntries.push({ popularity: parsedSort.direction })
+  } else {
+    orderByEntries.push({ name: parsedSort.direction })
+  }
+
+  if (!orderByEntries.some(entry => 'name' in entry)) {
+    orderByEntries.push({ name: 'asc' })
+  }
+
+  const orderBy = orderByEntries.length === 1 ? orderByEntries[0] : orderByEntries
+
+  const [filterOptions, total] = await Promise.all([
+    loadFilterOptions(delegate, columnSet),
+    delegate.count({ where }),
+  ])
+
   const rows = await delegate.findMany({
     where,
-    orderBy: { name: 'asc' },
+    orderBy,
     take: PAGE_SIZE,
     skip: (page - 1) * PAGE_SIZE,
   })
 
-  const columns = getAdminColumns(model)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  const makeHref = (p: number) => {
-    const params = new URLSearchParams()
-    params.set('model', model)
-    params.set('page', String(p))
-    if (q) params.set('q', q)
-    return `?${params.toString()}`
-  }
-
-  // Modal state must be client-side, so wrap table in a client component
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       <div className="mb-6 flex items-end justify-between gap-4">
@@ -63,6 +269,7 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
           params.set('model', m.key)
           params.set('page', '1')
           if (q) params.set('q', q)
+          if (parsedSort.value && parsedSort.value !== SORT_FALLBACK) params.set('sort', parsedSort.value)
           return (
             <Link
               key={m.key}
@@ -79,24 +286,18 @@ export default async function DataPage({ searchParams }: { searchParams: SearchP
         })}
       </div>
 
-      <form method="get" className="mb-6 flex gap-2 items-center">
-        <input name="q" defaultValue={q} placeholder="Search by name..." className="w-full rounded border px-3 py-2" />
-        <input type="hidden" name="model" value={model} />
-        <input type="hidden" name="page" value="1" />
-        <button type="submit" className="rounded bg-blue-600 px-4 py-2 text-white">Search</button>
-      </form>
-
-      <ClientTable rows={rows} columns={columns} />
-
-      <div className="mt-4 flex items-center justify-between">
-        <div className="text-sm text-slate-600">Total: {total} · Page {page} of {totalPages}</div>
-        <div className="flex gap-2">
-          <Link href={makeHref(Math.max(1, page - 1))} className="rounded border px-3 py-1 text-sm disabled:opacity-50" aria-disabled={page <= 1}>Prev</Link>
-          <Link href={makeHref(Math.min(totalPages, page + 1))} className="rounded border px-3 py-1 text-sm disabled:opacity-50" aria-disabled={page >= totalPages}>Next</Link>
-        </div>
-      </div>
+      <DataBrowserClient
+        model={model}
+        rows={rows}
+        columns={columns}
+        searchTerm={q}
+        total={total}
+        page={page}
+        totalPages={totalPages}
+        filterOptions={filterOptions}
+        selectedFilters={selectedFilters}
+        sort={parsedSort.value}
+      />
     </div>
   )
 }
-
-// All client code is now in ClientTable.tsx
