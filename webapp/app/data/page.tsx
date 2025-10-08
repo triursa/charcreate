@@ -251,53 +251,84 @@ export default async function DataPage({ searchParams }: { searchParams: RawSear
   })
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const currentModel = MODELS.find(entry => entry.key === model)
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
-      <div className="mb-6 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Data Browser</h1>
-          <p className="text-sm text-slate-600">Browse and search all datasets.</p>
+      <div className="mb-6">
+        <nav className="text-sm text-slate-500" aria-label="Breadcrumb">
+          <ol className="flex items-center gap-1">
+            <li>
+              <Link href="/" className="hover:text-slate-700 hover:underline">
+                Home
+              </Link>
+            </li>
+            <li aria-hidden="true">/</li>
+            <li>
+              <Link href="/data" className="hover:text-slate-700 hover:underline">
+                Data
+              </Link>
+            </li>
+            <li aria-hidden="true">/</li>
+            <li className="text-slate-700">{currentModel?.label ?? 'All Data'}</li>
+          </ol>
+        </nav>
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold">Data Browser</h1>
+            <p className="text-sm text-slate-600">Browse and search all datasets.</p>
+          </div>
+          <Link href="/charcreate" className="text-sm text-blue-600 hover:underline">Back to Planner</Link>
         </div>
-        <Link href="/charcreate" className="text-sm text-blue-600 hover:underline">Back to Planner</Link>
       </div>
 
-      <div className="mb-6 flex gap-2 border-b">
-        {MODELS.map(m => {
-          const isActive = m.key === model
-          const params = new URLSearchParams()
-          params.set('model', m.key)
-          params.set('page', '1')
-          if (q) params.set('q', q)
-          if (parsedSort.value && parsedSort.value !== SORT_FALLBACK) params.set('sort', parsedSort.value)
-          return (
-            <Link
-              key={m.key}
-              href={`?${params.toString()}`}
-              className={
-                'px-4 py-2 -mb-px border-b-2 text-sm font-medium ' +
-                (isActive ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-600 hover:text-blue-600')
-              }
-              scroll={false}
-            >
-              {m.label}
-            </Link>
-          )
-        })}
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[220px,1fr]">
+        <aside>
+          <div className="rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
+            <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Categories
+            </p>
+            <nav className="flex flex-col gap-1 text-sm" aria-label="Data categories">
+              {MODELS.map(m => {
+                const isActive = m.key === model
+                const params = new URLSearchParams()
+                params.set('model', m.key)
+                params.set('page', '1')
+                if (q) params.set('q', q)
+                if (parsedSort.value && parsedSort.value !== SORT_FALLBACK) params.set('sort', parsedSort.value)
+                return (
+                  <Link
+                    key={m.key}
+                    href={`?${params.toString()}`}
+                    className={`rounded-md px-3 py-2 font-medium transition-colors ${
+                      isActive
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                    scroll={false}
+                  >
+                    {m.label}
+                  </Link>
+                )
+              })}
+            </nav>
+          </div>
+        </aside>
+        <div className="min-w-0">
+          <DataBrowserClient
+            model={model}
+            rows={rows}
+            columns={columns}
+            searchTerm={q}
+            total={total}
+            page={page}
+            totalPages={totalPages}
+            filterOptions={filterOptions}
+            selectedFilters={selectedFilters}
+            sort={parsedSort.value}
+          />
+        </div>
       </div>
-
-      <DataBrowserClient
-        model={model}
-        rows={rows}
-        columns={columns}
-        searchTerm={q}
-        total={total}
-        page={page}
-        totalPages={totalPages}
-        filterOptions={filterOptions}
-        selectedFilters={selectedFilters}
-        sort={parsedSort.value}
-      />
     </div>
   )
 }
