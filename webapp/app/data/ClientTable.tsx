@@ -175,7 +175,7 @@ function formatSpell(entry: any) {
 type EntryModalProps = {
   entry: any
   onClose: () => void
-  renderActions?: (entry: any) => ReactNode
+  renderActions?: (entry: any, helpers: { closeEntry: () => void }) => ReactNode
 }
 
 function EntryModal({ entry, onClose, renderActions }: EntryModalProps) {
@@ -200,7 +200,7 @@ function EntryModal({ entry, onClose, renderActions }: EntryModalProps) {
         )}
         {renderActions && (
           <div className="mt-6 flex flex-wrap justify-end gap-2">
-            {renderActions(entry)}
+            {renderActions(entry, { closeEntry: onClose })}
           </div>
         )}
       </div>
@@ -211,7 +211,7 @@ function EntryModal({ entry, onClose, renderActions }: EntryModalProps) {
 type ClientTableProps = {
   rows: any[]
   columns: string[]
-  renderActions?: (entry: any) => ReactNode
+  renderActions?: (entry: any, helpers: { closeEntry: () => void }) => ReactNode
 }
 
 export default function ClientTable({ rows, columns, renderActions }: ClientTableProps) {

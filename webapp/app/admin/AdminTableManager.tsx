@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ClientTable from '../data/ClientTable'
 import type { AdminModelKey, AdminModelMeta } from './models'
+import { ADMIN_FORM_CONFIG, type AdminFormField } from './formConfig'
 
 export type AdminTableManagerProps = {
   model: AdminModelKey
@@ -15,6 +16,32 @@ export type AdminTableManagerProps = {
 type FlashState = { status: 'success' | 'error'; message: string } | null
 
 type PendingAction = { type: 'add' | 'edit'; entry?: any } | null
+
+type RenderActionHelpers = {
+  closeEntry: () => void
+}
+
+function resolveDefaultValue(field: AdminFormField, entry: any) {
+  if (!entry) return ''
+  const value = entry[field.name]
+  if (value === null || typeof value === 'undefined') return ''
+
+  if (field.type === 'json') {
+    try {
+      return JSON.stringify(value, null, 2)
+    } catch (error) {
+      console.warn('Failed to serialize JSON field for admin form', error)
+      return ''
+    }
+  }
+
+  if (field.type === 'int') {
+    if (typeof value === 'number') return String(value)
+    return typeof value === 'string' ? value : ''
+  }
+
+  return String(value)
+}
 
 export default function AdminTableManager({ model, rows, columns, models }: AdminTableManagerProps) {
   const router = useRouter()
@@ -62,7 +89,7 @@ export default function AdminTableManager({ model, rows, columns, models }: Admi
     router.push(`/admin?${params.toString()}`, { scroll: false })
   }
 
-  const renderActions = (entry: any) => {
+  const renderActions = (entry: any, { closeEntry }: RenderActionHelpers) => {
     const entryId = entry?.id
     const hasId = typeof entryId === 'number' || typeof entryId === 'string'
 
@@ -71,19 +98,29 @@ export default function AdminTableManager({ model, rows, columns, models }: Admi
         <button
           type="button"
           className="rounded border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          onClick={() => setPendingAction({ type: 'add' })}
+          onClick={() => {
+            closeEntry()
+            setPendingAction({ type: 'add' })
+          }}
         >
           Add
         </button>
         <button
           type="button"
           className="rounded border border-blue-600 px-3 py-1 text-sm font-medium text-blue-600 hover:bg-blue-50"
-          onClick={() => setPendingAction({ type: 'edit', entry })}
+          onClick={() => {
+            closeEntry()
+            setPendingAction({ type: 'edit', entry })
+          }}
         >
           Edit
         </button>
         {hasId ? (
-          <form method="post" action={`/admin/delete?model=${model}&id=${entryId}`}>
+          <form
+            method="post"
+            action={`/admin/delete?model=${model}&id=${entryId}`}
+            onSubmit={closeEntry}
+          >
             <button
               type="submit"
               className="rounded border border-red-600 px-3 py-1 text-sm font-medium text-red-600 hover:bg-red-50"
@@ -105,6 +142,10 @@ export default function AdminTableManager({ model, rows, columns, models }: Admi
   }
 
   const closeActionModal = () => setPendingAction(null)
+
+  const activeFormConfig = ADMIN_FORM_CONFIG[activeModel.key]
+  const formFields = activeFormConfig?.fields ?? []
+  const formAction = pendingAction?.type === 'edit' ? 'edit' : 'create'
 
   return (
     <div>
@@ -171,7 +212,7 @@ export default function AdminTableManager({ model, rows, columns, models }: Admi
 
       {pendingAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={closeActionModal}>
-          <div className="relative w-full max-w-lg rounded bg-white p-6 shadow-lg" onClick={event => event.stopPropagation()}>
+          <div className="relative w-full max-w-2xl rounded bg-white p-6 shadow-lg" onClick={event => event.stopPropagation()}>
             <button
               type="button"
               className="absolute right-4 top-4 text-slate-500 hover:text-slate-900"
@@ -180,27 +221,86 @@ export default function AdminTableManager({ model, rows, columns, models }: Admi
               &times;
             </button>
             <h2 className="mb-4 text-lg font-semibold">
-              {pendingAction.type === 'add' ? `Add new ${activeModel.singularLabel}` : `Edit ${activeModel.singularLabel} #${pendingAction.entry?.id}`}
-            </h2>
-            <p className="text-sm text-slate-600">
               {pendingAction.type === 'add'
-                ? 'Creation tooling will be added soon. In the meantime, compile the details you would like to add.'
-                : 'Editing workflows are coming soon. Review the selected entry below as reference.'}
-            </p>
-            {pendingAction.entry && (
-              <pre className="mt-4 max-h-64 overflow-auto rounded bg-slate-100 p-3 text-xs text-slate-800">
-                {JSON.stringify(pendingAction.entry, null, 2)}
-              </pre>
-            )}
-            <div className="mt-6 flex justify-end">
-              <button
-                type="button"
-                className="rounded border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                onClick={closeActionModal}
+                ? `Add new ${activeModel.singularLabel}`
+                : `Edit ${activeModel.singularLabel} #${pendingAction.entry?.id}`}
+            </h2>
+            {formFields.length === 0 ? (
+              <p className="text-sm text-slate-600">
+                No form configuration found for this dataset.
+              </p>
+            ) : (
+              <form
+                method="post"
+                action={`/admin/${activeModel.key}/${formAction}`}
+                className="space-y-5"
               >
-                Close
-              </button>
-            </div>
+                {pendingAction.type === 'edit' && (
+                  <input
+                    type="hidden"
+                    name="id"
+                    value={
+                      typeof pendingAction.entry?.id === 'number'
+                        ? String(pendingAction.entry.id)
+                        : pendingAction.entry?.id ?? ''
+                    }
+                  />
+                )}
+
+                {formFields.map(field => {
+                  const isJson = field.type === 'json'
+                  const defaultValue = resolveDefaultValue(field, pendingAction.entry)
+                  return (
+                    <div key={field.name} className="space-y-2">
+                      <label className="block text-sm font-medium text-slate-700" htmlFor={`admin-${field.name}`}>
+                        {field.label}
+                        {field.required && <span className="ml-1 text-red-500">*</span>}
+                      </label>
+                      {isJson ? (
+                        <textarea
+                          id={`admin-${field.name}`}
+                          name={field.name}
+                          defaultValue={defaultValue}
+                          rows={6}
+                          className="w-full rounded border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                          placeholder={field.placeholder}
+                          required={Boolean(field.required)}
+                        />
+                      ) : (
+                        <input
+                          id={`admin-${field.name}`}
+                          name={field.name}
+                          type={field.type === 'int' ? 'number' : 'text'}
+                          defaultValue={defaultValue}
+                          className="w-full rounded border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                          placeholder={field.placeholder}
+                          required={Boolean(field.required)}
+                        />
+                      )}
+                      {field.helpText && <p className="text-xs text-slate-500">{field.helpText}</p>}
+                    </div>
+                  )
+                })}
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    className="rounded border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    onClick={closeActionModal}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+                  >
+                    {pendingAction.type === 'add'
+                      ? `Create ${activeModel.singularLabel}`
+                      : `Save ${activeModel.singularLabel}`}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
