@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo } from 'react'
 
-import { classes as fallbackClasses } from '@/data/classes'
 import { useClassCatalogue } from '@/hooks/useClassCatalogue'
 import { useCharacterBuilder } from '@/state/character-builder'
 
@@ -15,12 +14,7 @@ export function ClassLeveler() {
 
   const { classes, isLoading } = useClassCatalogue()
 
-  const availableClasses = useMemo(() => {
-    if (classes.length > 0) {
-      return classes
-    }
-    return fallbackClasses
-  }, [classes])
+  const availableClasses = useMemo(() => classes, [classes])
 
   const selectedClass = useMemo(() => {
     if (classData) return classData

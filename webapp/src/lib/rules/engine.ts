@@ -1,12 +1,10 @@
-import { abilityList, abilityMod, proficiencyBonus } from '@/lib/abilities'
-import { ancestryMap } from '@/data/ancestries'
-import { classMap } from '@/data/classes'
-import { featMap } from '@/data/feats'
-import type { CharacterBuilderState, ResolvedDecisionValue } from '@/state/character-builder'
-import type { AbilityScoreEntry, AncestryRecord, BackgroundRecord, EntryLike, StructuredEntry } from '@/types/character-builder'
-import type { Character, Decision, FeatureInstance, LevelSnapshot } from '@/types/character'
-import type { Ability, Skill } from '@/types/character'
-import { skillNames } from '@/types/character'
+import { abilityList, abilityMod, proficiencyBonus } from '../abilities'
+import type { CharacterBuilderState, ResolvedDecisionValue } from '../../state/character-builder'
+import type { CatalogueClass, FeatDefinition } from '../../types/catalogue'
+import type { AbilityScoreEntry, AncestryRecord, BackgroundRecord, EntryLike, StructuredEntry } from '../../types/character-builder'
+import type { Character, Decision, FeatureInstance, LevelSnapshot } from '../../types/character'
+import type { Ability, Skill } from '../../types/character'
+import { skillNames } from '../../types/character'
 
 interface BuildResult {
   character: Character
@@ -14,21 +12,22 @@ interface BuildResult {
   warnings: string[]
 }
 
-interface SkillDecisionValue extends ResolvedDecisionValue {
+interface SkillDecisionValue {
   type: 'choose-skill'
   choices: Skill[]
 }
 
-interface AsiDecisionAbilityValue extends ResolvedDecisionValue {
+interface AsiDecisionAbilityValue {
   type: 'asi'
   mode: 'ability'
   abilities: Ability[]
 }
 
-interface AsiDecisionFeatValue extends ResolvedDecisionValue {
+interface AsiDecisionFeatValue {
   type: 'asi'
   mode: 'feat'
   featId: string
+  feat?: FeatDefinition
   abilitySelection?: Ability
 }
 
@@ -294,7 +293,7 @@ function applyFeatEffects(
   totalAbilities: Record<Ability, number>,
   features: FeatureInstance[]
 ) {
-  const feat = featMap[featValue.featId]
+  const feat = featValue.feat
   if (!feat) return
 
   if (feat.abilityIncreases) {
@@ -321,14 +320,21 @@ function applyFeatEffects(
     for (const feature of feat.features) {
       features.push({ ...feature, source: [...feature.source] })
     }
+  } else if (feat.description) {
+    features.push({
+      id: `feat-${featValue.featId}`,
+      name: feat.name,
+      source: [`Feat: ${feat.name}`],
+      description: feat.description,
+      mergeStrategy: 'set'
+    })
   }
 }
 
 export function buildCharacter(state: CharacterBuilderState): BuildResult {
-  const ancestry: AncestryRecord | undefined =
-    state.ancestryData ?? (state.ancestryId ? (ancestryMap[state.ancestryId] as unknown as AncestryRecord | undefined) : undefined)
+  const ancestry: AncestryRecord | undefined = state.ancestryData
   const background: BackgroundRecord | undefined = state.backgroundData
-  const cls = state.classData ?? (state.classId ? classMap[state.classId] : undefined)
+  const cls: CatalogueClass | undefined = state.classData
 
   const racialBonuses = emptyAbilityRecord()
   if (ancestry) {

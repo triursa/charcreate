@@ -1,18 +1,9 @@
-import type { Ability, FeatureInstance } from '@/types/character'
+import type { FeatDefinition } from '../types/catalogue'
 
-export interface FeatDefinition {
-  id: string
-  name: string
-  description: string
-  abilityIncreases?: Partial<Record<Ability, number>>
-  features?: FeatureInstance[]
-  prerequisites?: string[]
-}
+type FeatMetadataMap = Record<string, Pick<FeatDefinition, 'abilityIncreases' | 'features' | 'description'>>
 
-export const feats: FeatDefinition[] = [
-  {
-    id: 'alert',
-    name: 'Alert',
+export const FEAT_METADATA: FeatMetadataMap = {
+  alert: {
     description:
       'Always on the lookout for danger, you gain a +5 bonus to initiative and cannot be surprised while conscious.',
     features: [
@@ -25,9 +16,7 @@ export const feats: FeatDefinition[] = [
       }
     ]
   },
-  {
-    id: 'athlete',
-    name: 'Athlete',
+  athlete: {
     description:
       'Your physical training enhances your strength and agility. Increase your Strength or Dexterity by 1, up to a maximum of 20.',
     abilityIncreases: {
@@ -44,9 +33,7 @@ export const feats: FeatDefinition[] = [
       }
     ]
   },
-  {
-    id: 'resilient',
-    name: 'Resilient',
+  resilient: {
     description:
       'Choose one ability score. You gain proficiency in saving throws using the chosen ability, and increase the ability score by 1.',
     abilityIncreases: {
@@ -62,12 +49,9 @@ export const feats: FeatDefinition[] = [
         id: 'resilient',
         name: 'Resilient',
         source: ['Feat: Resilient'],
-        description:
-          'Gain proficiency in one saving throw of your choice and increase the corresponding ability score by 1.',
+        description: 'Gain proficiency in one saving throw of your choice and increase the corresponding ability score by 1.',
         mergeStrategy: 'set'
       }
     ]
   }
-]
-
-export const featMap = Object.fromEntries(feats.map((feat) => [feat.id, feat]))
+}
