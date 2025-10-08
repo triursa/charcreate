@@ -1,5 +1,6 @@
 import AdminTableManager from './AdminTableManager'
-import { ADMIN_MODELS, getAdminColumns, getAdminDelegate, normalizeAdminModel } from './helpers'
+import { ADMIN_MODELS, normalizeAdminModel } from './models'
+import { getAdminColumns, getAdminDelegate } from './helpers'
 
 type SearchParams = { [key: string]: string | string[] | undefined }
 

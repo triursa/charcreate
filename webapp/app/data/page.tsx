@@ -1,7 +1,8 @@
 
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { ADMIN_MODELS, getAdminColumns, getAdminDelegate, normalizeAdminModel } from '../admin/helpers'
+import { ADMIN_MODELS, normalizeAdminModel } from '../admin/models'
+import { getAdminColumns, getAdminDelegate } from '../admin/helpers'
 const ClientTable = dynamic(() => import('./ClientTable'), { ssr: false })
 
 const PAGE_SIZE = 20

@@ -1,18 +1,33 @@
 import { Prisma, PrismaClient, Spell } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { getAdminModelMeta, type AdminModelKey } from './models'
 
-export type DuplicateGroup = [string, Spell[]]
+export {
+  ADMIN_MODELS,
+  DEFAULT_ADMIN_MODEL,
+  getAdminModelMeta,
+  normalizeAdminModel,
+  parseAdminModelParam,
+  type AdminModelKey,
+  type AdminModelMeta,
+} from './models'
 
-export const ADMIN_MODELS = [
-  { key: 'spell', label: 'Spells', singularLabel: 'Spell', prismaModel: 'Spell' },
-  { key: 'race', label: 'Races', singularLabel: 'Race', prismaModel: 'Race' },
-  { key: 'item', label: 'Items', singularLabel: 'Item', prismaModel: 'Item' },
-  { key: 'background', label: 'Backgrounds', singularLabel: 'Background', prismaModel: 'Background' },
-  { key: 'feat', label: 'Feats', singularLabel: 'Feat', prismaModel: 'Feat' },
-  { key: 'class', label: 'Classes', singularLabel: 'Class', prismaModel: 'Class' },
-] as const
+export type DuplicateEntry = { id: number; [key: string]: unknown }
+export type DuplicateGroup<T extends DuplicateEntry = DuplicateEntry> = {
+  identifier: string
+  entries: T[]
+}
 
-export type AdminModelKey = typeof ADMIN_MODELS[number]['key']
+type AdminDuplicateHandler<T extends DuplicateEntry = DuplicateEntry> = {
+  load(client?: PrismaClient): Promise<DuplicateGroup<T>[]>
+  merge(params: {
+    canonicalId: number
+    group: DuplicateGroup<T>
+    client?: PrismaClient
+  }): Promise<{ deletedIds: number[] }>
+}
+
+export class UnsupportedDuplicateOperationError extends Error {}
 
 const ADMIN_DELEGATE_MAP: Record<AdminModelKey, (client: PrismaClient) => any> = {
   spell: client => client.spell,
@@ -25,10 +40,47 @@ const ADMIN_DELEGATE_MAP: Record<AdminModelKey, (client: PrismaClient) => any> =
 
 const ADMIN_COLUMN_CACHE = new Map<AdminModelKey, string[]>()
 
-export function normalizeAdminModel(model: string | null | undefined): AdminModelKey {
-  if (!model) return 'spell'
-  const match = ADMIN_MODELS.find(option => option.key === model)
-  return match ? match.key : 'spell'
+const ADMIN_DUPLICATE_HANDLERS: Partial<Record<AdminModelKey, AdminDuplicateHandler<any>>> = {
+  spell: {
+    async load(client = prisma) {
+      const allEntries: Spell[] = await client.spell.findMany()
+      const grouped = new Map<string, Spell[]>()
+
+      for (const entry of allEntries) {
+        const identifier = entry.name?.trim()
+        if (!identifier) continue
+        const entries = grouped.get(identifier) ?? []
+        entries.push(entry)
+        grouped.set(identifier, entries)
+      }
+
+      return Array.from(grouped.entries())
+        .filter(([, entries]) => entries.length > 1)
+        .map(([identifier, entries]) => ({ identifier, entries }))
+    },
+    async merge({ canonicalId, group, client = prisma }) {
+      const idsToDelete = group.entries
+        .filter(entry => entry.id !== canonicalId)
+        .map(entry => entry.id)
+
+      if (idsToDelete.length === 0) {
+        return { deletedIds: [] }
+      }
+
+      await client.spell.deleteMany({ where: { id: { in: idsToDelete } } })
+      return { deletedIds: idsToDelete }
+    },
+  },
+}
+
+function requireDuplicateHandler(model: AdminModelKey): AdminDuplicateHandler<any> {
+  const handler = ADMIN_DUPLICATE_HANDLERS[model]
+  if (!handler) {
+    throw new UnsupportedDuplicateOperationError(
+      `Duplicate merging is not supported for model "${model}".`,
+    )
+  }
+  return handler
 }
 
 export function getAdminDelegate(model: AdminModelKey, client: PrismaClient = prisma) {
@@ -39,9 +91,7 @@ export function getAdminColumns(model: AdminModelKey): string[] {
   const cached = ADMIN_COLUMN_CACHE.get(model)
   if (cached) return cached
 
-  const prismaModelName = ADMIN_MODELS.find(option => option.key === model)?.prismaModel
-  if (!prismaModelName) return []
-
+  const prismaModelName = getAdminModelMeta(model).prismaModel
   const prismaModel = Prisma.dmmf.datamodel.models.find(entry => entry.name === prismaModelName)
   if (!prismaModel) return []
 
@@ -50,22 +100,27 @@ export function getAdminColumns(model: AdminModelKey): string[] {
   return columns
 }
 
-export async function loadSpellDuplicates(client: PrismaClient = prisma): Promise<DuplicateGroup[]> {
-  const allEntries = await client.spell.findMany()
-  const grouped: Record<string, Spell[]> = {}
+export async function loadAdminDuplicateGroups(
+  model: AdminModelKey,
+  client: PrismaClient = prisma,
+): Promise<DuplicateGroup[]> {
+  const handler = requireDuplicateHandler(model)
+  return handler.load(client)
+}
 
-  for (const entry of allEntries) {
-    if (!entry.name) continue
-    if (!grouped[entry.name]) grouped[entry.name] = []
-    grouped[entry.name].push(entry)
-  }
-
-  return Object.entries(grouped).filter(([, group]) => group.length > 1)
+export async function mergeAdminDuplicateGroup(
+  model: AdminModelKey,
+  canonicalId: number,
+  group: DuplicateGroup,
+  client: PrismaClient = prisma,
+): Promise<{ deletedIds: number[] }> {
+  const handler = requireDuplicateHandler(model)
+  return handler.merge({ canonicalId, group, client })
 }
 
 export type ParseIdResult =
-  | { ok: true, id: number }
-  | { ok: false, error: string }
+  | { ok: true; id: number }
+  | { ok: false; error: string }
 
 export function parseIdParam(value: string | null): ParseIdResult {
   if (!value) {
