@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
+
+import { EntryModal } from './EntryModal'
 
 type ClientTableProps = {
   rows: any[]
@@ -431,104 +433,132 @@ function getRowKey(row: any, index: number): string | number {
 }
 
 export default function ClientTable({ rows, columns, renderActions }: ClientTableProps) {
-  const [expandedEntries, setExpandedEntries] = useState<Set<string | number>>(new Set())
+  const [activeEntry, setActiveEntry] = useState<any | null>(null)
+  const [activeEntryKey, setActiveEntryKey] = useState<string | number | null>(null)
 
-  const toggleEntry = (key: string | number) => {
-    setExpandedEntries(previous => {
-      const next = new Set(previous)
-      if (next.has(key)) {
-        next.delete(key)
-      } else {
-        next.add(key)
-      }
-      return next
-    })
-  }
+  const openEntry = useCallback((entry: any, key: string | number) => {
+    setActiveEntry(entry)
+    setActiveEntryKey(key)
+  }, [])
 
-  const closeEntry = (key: string | number) => {
-    setExpandedEntries(previous => {
-      if (!previous.has(key)) return previous
-      const next = new Set(previous)
-      next.delete(key)
-      return next
-    })
-  }
+  const closeEntry = useCallback(() => {
+    setActiveEntry(null)
+    setActiveEntryKey(null)
+  }, [])
+
+  const activeModalId = useMemo(() => {
+    if (activeEntryKey == null) return undefined
+    const normalized = String(activeEntryKey).toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'details'
+    return `entry-modal-${normalized}`
+  }, [activeEntryKey])
+
+  const activeSourceLabel = useMemo(() => extractSourceLabel(activeEntry?.source), [activeEntry])
+  const activeFooter = useMemo(() => {
+    if (!renderActions || !activeEntry) return undefined
+    return renderActions(activeEntry, { closeEntry })
+  }, [activeEntry, closeEntry, renderActions])
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {rows.map((row, index) => {
-        const rowKey = getRowKey(row, index)
-        const isExpanded = expandedEntries.has(rowKey)
+    <>
+      <div className="grid gap-6 p-1 sm:grid-cols-2 xl:grid-cols-3">
+        {rows.map((row, index) => {
+          const rowKey = getRowKey(row, index)
+          const entryName = typeof row?.name === 'string' ? row.name : `Entry ${index + 1}`
+          const normalizedKey = String(rowKey ?? index).toLowerCase().replace(/[^a-z0-9]+/g, '-') || `entry-${index}`
+          const headingId = `entry-${normalizedKey}-title`
+          const summaryId = `entry-${normalizedKey}-summary`
+          const modalId = `entry-modal-${normalizedKey}`
 
-        const abilitySummary = formatAbilitySummary(
-          row?.ability ?? row?.abilityBoosts ?? row?.abilityBonuses ?? row?.abilityBonus,
-        )
-        const speedSummary = formatSpeedSummary(row?.speed ?? row?.movement)
-        const languagesSummary = formatLanguageSummary(row?.languageProficiencies ?? row?.languages)
-        const sourceLabel = extractSourceLabel(row?.source)
+          const abilitySummary = formatAbilitySummary(
+            row?.ability ?? row?.abilityBoosts ?? row?.abilityBonuses ?? row?.abilityBonus,
+          )
+          const speedSummary = formatSpeedSummary(row?.speed ?? row?.movement)
+          const languagesSummary = formatLanguageSummary(row?.languageProficiencies ?? row?.languages)
+          const sourceLabel = extractSourceLabel(row?.source)
 
-        const summaryItems = [
-          { label: 'Ability Boosts', value: abilitySummary },
-          { label: 'Speed', value: speedSummary },
-          { label: 'Languages', value: languagesSummary },
-        ].filter(item => item.value)
+          const summaryItems = [
+            { label: 'Ability Boosts', value: abilitySummary },
+            { label: 'Speed', value: speedSummary },
+            { label: 'Languages', value: languagesSummary },
+          ].filter(item => item.value)
 
-        return (
-          <article
-            key={rowKey}
-            className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
-          >
-            <div className="flex flex-col gap-4 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="truncate text-lg font-semibold text-slate-900">
-                    {typeof row?.name === 'string' ? row.name : `Entry ${index + 1}`}
-                  </h2>
-                  {sourceLabel && (
-                    <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
-                      {sourceLabel}
-                    </p>
+          const descriptionSummary = [summaryItems.length > 0 ? `${summaryItems.length} summary items` : null, sourceLabel]
+            .filter(Boolean)
+            .join('. ')
+
+          return (
+            <article
+              key={rowKey}
+              className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500"
+              aria-labelledby={headingId}
+              aria-describedby={summaryId}
+            >
+              <div className="flex flex-col gap-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 id={headingId} className="truncate text-lg font-semibold text-slate-900">
+                      {entryName}
+                    </h2>
+                    {sourceLabel && (
+                      <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+                        {sourceLabel}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openEntry(row, rowKey)}
+                    className="shrink-0 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    aria-haspopup="dialog"
+                    aria-controls={modalId}
+                    aria-label={`View detailed information for ${entryName}`}
+                  >
+                    View Details
+                  </button>
+                </div>
+
+                <div id={summaryId} className="space-y-3 text-sm text-slate-700">
+                  {summaryItems.length > 0 ? (
+                    <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {summaryItems.map(item => (
+                        <div key={item.label} className="space-y-1">
+                          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            {item.label}
+                          </dt>
+                          <dd className="text-sm font-medium text-slate-800">{item.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : (
+                    <p className="text-sm text-slate-600">No quick summary available.</p>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => toggleEntry(rowKey)}
-                  className="shrink-0 rounded border border-slate-300 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-50"
-                >
-                  {isExpanded ? 'Hide' : 'Details'}
-                </button>
               </div>
+              <p className="text-xs text-slate-500">{descriptionSummary || 'Detailed information available in modal view.'}</p>
+            </article>
+          )
+        })}
+      </div>
 
-              {summaryItems.length > 0 ? (
-                <dl className="grid grid-cols-1 gap-3 text-sm text-slate-700 sm:grid-cols-2">
-                  {summaryItems.map(item => (
-                    <div key={item.label} className="space-y-1">
-                      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        {item.label}
-                      </dt>
-                      <dd className="text-sm font-medium text-slate-800">{item.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              ) : (
-                <p className="text-sm text-slate-600">No quick summary available.</p>
-              )}
-            </div>
-
-            {isExpanded && (
-              <div className="flex flex-col gap-4 border-t border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                <EntryDetails entry={row} columns={columns} rowKey={rowKey} />
-                {renderActions && (
-                  <div className="flex flex-wrap justify-end gap-2 pt-2">
-                    {renderActions(row, { closeEntry: () => closeEntry(rowKey) })}
-                  </div>
-                )}
-              </div>
-            )}
-          </article>
-        )
-      })}
-    </div>
+      <EntryModal
+        id={activeModalId}
+        open={Boolean(activeEntry)}
+        onClose={closeEntry}
+        title={
+          typeof activeEntry?.name === 'string'
+            ? activeEntry.name
+            : activeEntryKey != null
+              ? `Entry ${String(activeEntryKey)}`
+              : 'Entry Details'
+        }
+        description={activeSourceLabel ?? undefined}
+        footer={activeFooter}
+      >
+        {activeEntry ? (
+          <EntryDetails entry={activeEntry} columns={columns} rowKey={activeEntryKey ?? 'active'} />
+        ) : null}
+      </EntryModal>
+    </>
   )
 }
 
