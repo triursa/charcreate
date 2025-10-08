@@ -57,3 +57,4 @@ data/*
 
 # Working Directory of Prisma headers
 webapp/prune/*
+webapp/.test-build/

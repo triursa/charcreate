@@ -22,6 +22,8 @@ import {
   DecisionResolutionStep,
   SummaryStep
 } from '@/components/character/steps'
+import { useAncestries } from '@/hooks/useAncestries'
+import { useBackgrounds } from '@/hooks/useBackgrounds'
 import { useCharacterBuilder } from '@/state/character-builder'
 import {
   SelectionModal,
@@ -51,88 +53,22 @@ export function GuidedCharacterLayout() {
   const [targetLevel, setTargetLevel] = useState(() => Math.max(1, state.level))
   const [isAncestryModalOpen, setIsAncestryModalOpen] = useState(false)
   const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false)
-  const [ancestries, setAncestries] = useState<AncestryRecord[]>([])
-  const [backgrounds, setBackgrounds] = useState<BackgroundRecord[]>([])
-  const [ancestryLoading, setAncestryLoading] = useState(false)
-  const [backgroundLoading, setBackgroundLoading] = useState(false)
-  const [ancestryError, setAncestryError] = useState<string | null>(null)
-  const [backgroundError, setBackgroundError] = useState<string | null>(null)
+  const {
+    ancestries,
+    ancestryIds,
+    loading: ancestryLoading,
+    error: ancestryError,
+    refresh: refreshAncestries
+  } = useAncestries({ enabled: isAncestryModalOpen })
+  const {
+    backgrounds,
+    backgroundIds,
+    loading: backgroundLoading,
+    error: backgroundError,
+    refresh: refreshBackgrounds
+  } = useBackgrounds({ enabled: isBackgroundModalOpen })
   const [pendingAncestryId, setPendingAncestryId] = useState<string | null>(null)
   const [pendingBackgroundId, setPendingBackgroundId] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!isAncestryModalOpen || ancestries.length > 0 || ancestryLoading) {
-      return
-    }
-
-    let cancelled = false
-    setAncestryLoading(true)
-    setAncestryError(null)
-
-    fetch('/api/races')
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error('Unable to load ancestries')
-        }
-        return response.json()
-      })
-      .then((data: AncestryRecord[]) => {
-        if (!cancelled) {
-          setAncestries(data)
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setAncestryError(error instanceof Error ? error.message : 'Failed to load ancestries')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setAncestryLoading(false)
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [ancestries.length, ancestryLoading, isAncestryModalOpen])
-
-  useEffect(() => {
-    if (!isBackgroundModalOpen || backgrounds.length > 0 || backgroundLoading) {
-      return
-    }
-
-    let cancelled = false
-    setBackgroundLoading(true)
-    setBackgroundError(null)
-
-    fetch('/api/backgrounds')
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error('Unable to load backgrounds')
-        }
-        return response.json()
-      })
-      .then((data: BackgroundRecord[]) => {
-        if (!cancelled) {
-          setBackgrounds(data)
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setBackgroundError(error instanceof Error ? error.message : 'Failed to load backgrounds')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setBackgroundLoading(false)
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [backgroundLoading, backgrounds.length, isBackgroundModalOpen])
 
   useEffect(() => {
     if (isAncestryModalOpen) {
@@ -146,19 +82,31 @@ export function GuidedCharacterLayout() {
     }
   }, [isBackgroundModalOpen, state.backgroundId])
 
+  const ancestryById = useMemo(() => {
+    return new Map(ancestries.map((ancestry) => [ancestry.id, ancestry] as const))
+  }, [ancestries])
   const selectedAncestry: AncestryRecord | undefined = useMemo(() => {
     if (state.ancestryData) {
       return state.ancestryData as AncestryRecord
     }
-    return ancestries.find((ancestry) => ancestry.id === state.ancestryId)
-  }, [ancestries, state.ancestryData, state.ancestryId])
+    if (!state.ancestryId) {
+      return undefined
+    }
+    return ancestryById.get(state.ancestryId)
+  }, [ancestryById, state.ancestryData, state.ancestryId])
 
+  const backgroundById = useMemo(() => {
+    return new Map(backgrounds.map((background) => [background.id, background] as const))
+  }, [backgrounds])
   const selectedBackground: BackgroundRecord | undefined = useMemo(() => {
     if (state.backgroundData) {
       return state.backgroundData as BackgroundRecord
     }
-    return backgrounds.find((background) => background.id === state.backgroundId)
-  }, [backgrounds, state.backgroundData, state.backgroundId])
+    if (!state.backgroundId) {
+      return undefined
+    }
+    return backgroundById.get(state.backgroundId)
+  }, [backgroundById, state.backgroundData, state.backgroundId])
 
   const ancestrySummary = selectedAncestry ? getAncestrySummary(selectedAncestry) : undefined
   const ancestryPlaceholderSummary =
@@ -167,6 +115,9 @@ export function GuidedCharacterLayout() {
   const backgroundSummary = selectedBackground ? getBackgroundSummary(selectedBackground) : undefined
   const backgroundPlaceholderSummary =
     'Open the background library to find the experiences, skills, and connections that shaped your hero.'
+
+  const isPendingAncestryValid = pendingAncestryId ? ancestryIds.includes(pendingAncestryId) : false
+  const isPendingBackgroundValid = pendingBackgroundId ? backgroundIds.includes(pendingBackgroundId) : false
 
   const handleTargetLevelChange = useCallback(
     (level: number) => {
@@ -241,24 +192,30 @@ export function GuidedCharacterLayout() {
   }, [backgrounds])
 
   const handleConfirmAncestry = () => {
-    if (!pendingAncestryId) {
-      setIsAncestryModalOpen(false)
+    if (!pendingAncestryId || !ancestryIds.includes(pendingAncestryId)) {
       return
     }
 
-    const selection = ancestries.find((ancestry) => ancestry.id === pendingAncestryId)
-    actions.setAncestry(selection ?? pendingAncestryId)
+    const selection = ancestryById.get(pendingAncestryId)
+    if (selection) {
+      actions.setAncestry(selection)
+    } else {
+      actions.setAncestry(pendingAncestryId)
+    }
     setIsAncestryModalOpen(false)
   }
 
   const handleConfirmBackground = () => {
-    if (!pendingBackgroundId) {
-      setIsBackgroundModalOpen(false)
+    if (!pendingBackgroundId || !backgroundIds.includes(pendingBackgroundId)) {
       return
     }
 
-    const selection = backgrounds.find((background) => background.id === pendingBackgroundId)
-    actions.setBackground(selection ?? pendingBackgroundId)
+    const selection = backgroundById.get(pendingBackgroundId)
+    if (selection) {
+      actions.setBackground(selection)
+    } else {
+      actions.setBackground(pendingBackgroundId)
+    }
     setIsBackgroundModalOpen(false)
   }
 
@@ -536,8 +493,17 @@ export function GuidedCharacterLayout() {
 
           if (ancestryError && ancestries.length === 0) {
             return (
-              <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200">
-                {ancestryError}
+              <div className="space-y-3">
+                <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200">
+                  {ancestryError}
+                </div>
+                <button
+                  type="button"
+                  onClick={refreshAncestries}
+                  className="text-sm font-medium text-blue-600 underline-offset-2 transition hover:underline dark:text-blue-400"
+                >
+                  Try again
+                </button>
               </div>
             )
           }
@@ -574,7 +540,7 @@ export function GuidedCharacterLayout() {
                 <button
                   type="button"
                   onClick={handleConfirmAncestry}
-                  disabled={!pendingAncestryId}
+                  disabled={!isPendingAncestryValid}
                   className="rounded-full bg-blue-600 px-6 py-2 text-sm font-semibold text-white shadow transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700"
                 >
                   Confirm ancestry
@@ -602,8 +568,17 @@ export function GuidedCharacterLayout() {
 
           if (backgroundError && backgrounds.length === 0) {
             return (
-              <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200">
-                {backgroundError}
+              <div className="space-y-3">
+                <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200">
+                  {backgroundError}
+                </div>
+                <button
+                  type="button"
+                  onClick={refreshBackgrounds}
+                  className="text-sm font-medium text-indigo-600 underline-offset-2 transition hover:underline dark:text-indigo-400"
+                >
+                  Try again
+                </button>
               </div>
             )
           }
@@ -640,7 +615,7 @@ export function GuidedCharacterLayout() {
                 <button
                   type="button"
                   onClick={handleConfirmBackground}
-                  disabled={!pendingBackgroundId}
+                  disabled={!isPendingBackgroundValid}
                   className="rounded-full bg-indigo-600 px-6 py-2 text-sm font-semibold text-white shadow transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700"
                 >
                   Confirm background
