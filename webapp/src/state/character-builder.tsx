@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useReducer } from 'react
 
 import { abilityList } from '@/lib/abilities'
 import { buildCharacter } from '@/lib/rules/engine'
+import { useOptionalFeatures } from '@/hooks/useOptionalFeatures'
 import type { CatalogueClass, FeatDefinition } from '@/types/catalogue'
 import type { AncestryRecord, BackgroundRecord } from '@/types/character-builder'
 import type { Character, Decision } from '@/types/character'
@@ -34,6 +35,7 @@ export type ResolvedDecisionValue =
   | { type: 'asi'; mode: 'ability'; abilities: Ability[] }
   | { type: 'asi'; mode: 'feat'; featId: string; feat?: FeatDefinition; abilitySelection?: Ability }
   | { type: 'choose-subclass'; choice: string }
+  | { type: 'choose-optional-feature'; featureType: string; choices: string[]; progressionId?: string; level?: number }
   | { type: 'custom'; data: unknown }
 
 export interface CharacterBuilderState {
@@ -255,7 +257,12 @@ export function CharacterBuilderProvider({ children }: { children: React.ReactNo
     persistCurrentState(state)
   }, [state])
 
-  const buildResult = useMemo(() => buildCharacter(state), [state])
+  const { optionalFeaturesByType, optionalFeaturesById } = useOptionalFeatures()
+
+  const buildResult = useMemo(
+    () => buildCharacter(state, { optionalFeaturesByType, optionalFeaturesById }),
+    [optionalFeaturesById, optionalFeaturesByType, state]
+  )
 
   const actions = useMemo(
     () => ({

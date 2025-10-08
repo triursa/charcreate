@@ -4,7 +4,12 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { mergeClassMetadata } from '../lib/classMetadata'
 import { getContentByCategory } from '../lib/clientDataLoader'
-import type { CatalogueClass, ClassDefinition, SubclassDefinition } from '../types/catalogue'
+import type {
+  CatalogueClass,
+  ClassDefinition,
+  OptionalFeatureProgressionEntry,
+  SubclassDefinition
+} from '../types/catalogue'
 import type { Ability, Skill } from '../types/character'
 
 interface UseClassCatalogueResult {
@@ -358,6 +363,84 @@ function parseClassFeatures(
   }
 }
 
+function parseOptionalFeatureProgression(
+  classId: string,
+  rawProgression: unknown
+): OptionalFeatureProgressionEntry[] {
+  if (!rawProgression) {
+    return []
+  }
+
+  const entries = coerceArray<any>(rawProgression)
+  const parsed: OptionalFeatureProgressionEntry[] = []
+
+  entries.forEach((entry, index) => {
+    if (typeof entry !== 'object' || entry === null) {
+      return
+    }
+
+    const nameValue = (entry as { name?: unknown }).name
+    const name = typeof nameValue === 'string' ? nameValue : undefined
+    const featureTypeValue = (entry as { featureType?: unknown }).featureType
+    const featureTypes = Array.isArray(featureTypeValue)
+      ? featureTypeValue.filter((value: unknown): value is string => typeof value === 'string' && value.trim().length > 0)
+      : typeof featureTypeValue === 'string'
+        ? [featureTypeValue]
+        : []
+
+    const progressionValue = (entry as { progression?: unknown }).progression
+    const progression = Array.isArray(progressionValue)
+      ? progressionValue
+          .map((step, stepIndex) => {
+            if (typeof step !== 'object' || step === null) {
+              return undefined
+            }
+            const levelValue = (step as { level?: unknown }).level
+            const level = typeof levelValue === 'number' ? levelValue : Number.parseInt(String(levelValue ?? ''), 10)
+            if (!Number.isFinite(level) || level <= 0) {
+              return undefined
+            }
+            const countValue = (step as { count?: unknown }).count
+            const knownValue = (step as { known?: unknown }).known
+            const count = typeof countValue === 'number' ? countValue : undefined
+            const known = typeof knownValue === 'number' ? knownValue : undefined
+            return {
+              level,
+              count,
+              known,
+              raw: step,
+              index: stepIndex
+            }
+          })
+          .filter((step): step is { level: number; count?: number; known?: number; raw: unknown; index: number } => Boolean(step))
+      : []
+
+    if (featureTypes.length === 0 || progression.length === 0) {
+      return
+    }
+
+    const id = slugify(name) || `${classId}-optional-${index + 1}`
+    const sourceValue = (entry as { source?: unknown }).source
+    const source = typeof sourceValue === 'string' ? sourceValue : undefined
+
+    parsed.push({
+      id,
+      name,
+      featureTypes,
+      progression: progression.map(({ level, count, known, raw: rawStep }) => ({
+        level,
+        count,
+        known,
+        raw: rawStep
+      })),
+      source,
+      raw: entry
+    })
+  })
+
+  return parsed
+}
+
 function aggregateClassEntries(id: string, entries: any[]): any {
   if (entries.length === 0) {
     return { __catalogueId: id }
@@ -366,6 +449,7 @@ function aggregateClassEntries(id: string, entries: any[]): any {
   const base = { ...entries[0] }
   base.__catalogueId = id
   base.classFeatures = entries.flatMap((entry) => coerceArray(entry?.classFeatures))
+  base.optionalfeatureProgression = entries.flatMap((entry) => coerceArray(entry?.optionalfeatureProgression))
 
   const primaryAbilityEntry = entries.find((entry) => entry?.primaryAbility) ?? entries[0]
   base.primaryAbility = primaryAbilityEntry?.primaryAbility
@@ -396,6 +480,8 @@ function normalizeClassEntry(raw: any): CatalogueClass {
     primaryAbility = abilityList
   }
 
+  const optionalFeatureProgression = parseOptionalFeatureProgression(id, raw?.optionalfeatureProgression)
+
   const metadata = mergeClassMetadata(id, {
     id,
     name,
@@ -412,6 +498,7 @@ function normalizeClassEntry(raw: any): CatalogueClass {
     subclassLevel: undefined,
     featuresByLevel: {},
     asiLevels: [],
+    optionalFeatureProgression,
     description: extractText(raw?.description ?? raw?.entries),
     source: raw?.source,
     raw
@@ -434,6 +521,10 @@ function normalizeClassEntry(raw: any): CatalogueClass {
     subclassLevel: metadata.subclassLevel ?? parsedFeatures.subclassLevel,
     featuresByLevel: Object.keys(parsedFeatures.featuresByLevel).length > 0 ? parsedFeatures.featuresByLevel : metadata.featuresByLevel,
     asiLevels: parsedFeatures.asiLevels.length > 0 ? parsedFeatures.asiLevels : metadata.asiLevels,
+    optionalFeatureProgression:
+      optionalFeatureProgression.length > 0
+        ? optionalFeatureProgression
+        : metadata.optionalFeatureProgression ?? [],
     description: metadata.description,
     source: metadata.source,
     raw

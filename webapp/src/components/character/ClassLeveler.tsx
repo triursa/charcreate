@@ -39,6 +39,21 @@ export function ClassLeveler() {
   const selectedSubclass =
     subclassDecision && subclassDecision.type === 'choose-subclass' ? subclassDecision.choice : undefined
 
+  if (!selectedClass) {
+    return (
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Class &amp; Level Progression</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Loading class data…
+            </p>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   const primaryAbilities = Array.isArray(selectedClass.primaryAbility)
     ? selectedClass.primaryAbility
     : selectedClass.primaryAbility

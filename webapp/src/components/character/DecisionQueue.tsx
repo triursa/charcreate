@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { abilityList } from '@/lib/abilities'
 import { useFeats } from '@/hooks/useFeats'
+import { useOptionalFeatures } from '@/hooks/useOptionalFeatures'
 import type { Ability, Decision, Skill } from '@/types/character'
 import type { FeatDefinition } from '@/types/catalogue'
+import type { OptionalFeatureRecord } from '@/types/optional-features'
 import { useCharacterBuilder } from '@/state/character-builder'
 import type { ResolvedDecisionValue } from '@/state/character-builder'
 
@@ -37,7 +39,12 @@ interface SubclassDraft {
   choice: string
 }
 
-type Draft = SkillDraft | AsiDraft | LanguageDraft | ToolDraft | SubclassDraft
+interface OptionalFeatureDraft {
+  type: 'choose-optional-feature'
+  choices: string[]
+}
+
+type Draft = SkillDraft | AsiDraft | LanguageDraft | ToolDraft | SubclassDraft | OptionalFeatureDraft
 
 export function DecisionQueue() {
   const {
@@ -49,6 +56,7 @@ export function DecisionQueue() {
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
   const [errors, setErrors] = useState<Record<string, string | undefined>>({})
   const { feats, isLoading: isFeatsLoading } = useFeats()
+  const { optionalFeaturesById } = useOptionalFeatures()
   const featById = useMemo<Record<string, FeatDefinition>>(
     () => Object.fromEntries(feats.map((feat) => [feat.id, feat])),
     [feats]
@@ -133,6 +141,18 @@ export function DecisionQueue() {
           } else {
             next[decision.id] = { type: 'choose-subclass', choice: '' }
           }
+        } else if (decision.type === 'choose-optional-feature') {
+          const existing = current[decision.id] as OptionalFeatureDraft | undefined
+          if (existing) {
+            next[decision.id] = existing
+            continue
+          }
+          const resolved = resolvedDecisions[decision.id] as ResolvedDecisionValue | undefined
+          if (resolved && resolved.type === 'choose-optional-feature') {
+            next[decision.id] = { type: 'choose-optional-feature', choices: [...resolved.choices] }
+          } else {
+            next[decision.id] = { type: 'choose-optional-feature', choices: [] }
+          }
         }
       }
       return next
@@ -211,6 +231,26 @@ export function DecisionQueue() {
       ...current,
       [decisionId]: { type: 'choose-subclass', choice: subclassId }
     }))
+  }
+
+  const handleOptionalFeatureToggle = (decision: Decision, featureId: string) => {
+    setDrafts((current) => {
+      const existing =
+        (current[decision.id] as OptionalFeatureDraft | undefined) ?? { type: 'choose-optional-feature', choices: [] }
+      const selections = new Set(existing.choices)
+      if (selections.has(featureId)) {
+        selections.delete(featureId)
+      } else {
+        if (selections.size >= decision.max) {
+          return current
+        }
+        selections.add(featureId)
+      }
+      return {
+        ...current,
+        [decision.id]: { type: 'choose-optional-feature', choices: Array.from(selections) }
+      }
+    })
   }
 
   const handleAsiChange = (decisionId: string, index: number, ability: string) => {
@@ -360,6 +400,26 @@ export function DecisionQueue() {
         featId: draft.featId,
         feat,
         abilitySelection: draft.abilitySelection || undefined
+      })
+      setErrors((current) => ({ ...current, [decision.id]: undefined }))
+      return
+    }
+
+    if (decision.type === 'choose-optional-feature' && draft.type === 'choose-optional-feature') {
+      if (draft.choices.length < decision.min || draft.choices.length > decision.max) {
+        const message =
+          decision.min === decision.max
+            ? `Pick exactly ${decision.max} option${decision.max === 1 ? '' : 's'}.`
+            : `Pick between ${decision.min} and ${decision.max} options.`
+        setErrors((current) => ({ ...current, [decision.id]: message }))
+        return
+      }
+      actions.resolveDecision(decision.id, {
+        type: 'choose-optional-feature',
+        featureType: decision.featureType ?? '',
+        choices: draft.choices,
+        progressionId: decision.progressionId,
+        level: decision.level
       })
       setErrors((current) => ({ ...current, [decision.id]: undefined }))
       return
@@ -525,6 +585,57 @@ export function DecisionQueue() {
                       }
                     </p>
                   )}
+                </div>
+              )}
+
+              {decision.type === 'choose-optional-feature' && draft?.type === 'choose-optional-feature' && (
+                <div className="mt-3 space-y-3 text-sm">
+                  {decision.options.length === 0 && (
+                    <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-200">
+                      No optional features available for this choice yet. Try reloading once data syncs.
+                    </p>
+                  )}
+                  {decision.options.map((option: OptionalFeatureRecord) => {
+                    if (!option || typeof option !== 'object') {
+                      return null
+                    }
+                    const optionId = option.id
+                    if (!optionId) {
+                      return null
+                    }
+                    const feature = optionalFeaturesById[optionId] ?? option
+                    const selected = draft.choices.includes(optionId)
+                    const disabled = !selected && draft.choices.length >= decision.max
+                    return (
+                      <label
+                        key={optionId}
+                        className={`flex cursor-pointer gap-3 rounded-lg border p-3 ${
+                          selected
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-200'
+                            : 'border-slate-200 hover:border-blue-400 dark:border-slate-700 dark:hover:border-blue-400'
+                        } ${disabled ? 'opacity-60' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => handleOptionalFeatureToggle(decision, optionId)}
+                          className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500"
+                          disabled={disabled && !selected}
+                        />
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{feature.name}</p>
+                          {feature.source && (
+                            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                              {feature.source}
+                            </p>
+                          )}
+                          {feature.description && (
+                            <p className="text-xs text-slate-600 dark:text-slate-300">{feature.description}</p>
+                          )}
+                        </div>
+                      </label>
+                    )
+                  })}
                 </div>
               )}
 

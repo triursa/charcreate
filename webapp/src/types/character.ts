@@ -73,12 +73,22 @@ export interface FeatureInstance {
 
 export interface Decision {
   id: string
-  type: 'choose-skill' | 'choose-feat' | 'asi' | 'choose-tool' | 'choose-language' | 'choose-subclass'
+  type:
+    | 'choose-skill'
+    | 'choose-feat'
+    | 'asi'
+    | 'choose-tool'
+    | 'choose-language'
+    | 'choose-subclass'
+    | 'choose-optional-feature'
   options: any[]
   min: number
   max: number
   prerequisites?: string[]
   label?: string
+  featureType?: string
+  progressionId?: string
+  level?: number
 }
 
 export interface LevelSnapshot {

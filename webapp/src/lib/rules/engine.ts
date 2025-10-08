@@ -5,6 +5,7 @@ import type { AbilityScoreEntry, AncestryRecord, BackgroundRecord, EntryLike, St
 import type { Character, Decision, FeatureInstance, LevelSnapshot } from '../../types/character'
 import type { Ability, Skill } from '../../types/character'
 import { skillNames } from '../../types/character'
+import type { OptionalFeatureRecord } from '../../types/optional-features'
 
 interface BuildResult {
   character: Character
@@ -32,6 +33,20 @@ interface AsiDecisionFeatValue {
 }
 
 type DecisionValue = SkillDecisionValue | AsiDecisionAbilityValue | AsiDecisionFeatValue | ResolvedDecisionValue
+
+interface BuildOptions {
+  optionalFeaturesByType?: Record<string, OptionalFeatureRecord[]>
+  optionalFeaturesById?: Record<string, OptionalFeatureRecord>
+}
+
+interface OptionalFeatureUnlock {
+  decisionKey: string
+  featureType: string
+  level: number
+  count: number
+  label?: string
+  progressionId?: string
+}
 
 const averageHitDie: Record<number, number> = {
   6: 4,
@@ -156,6 +171,99 @@ function collectChoicePrompts(value: EntryLike | undefined): ChoicePrompt[] {
     return results
   }
   return []
+}
+
+function collectOptionalFeatureUnlocks(cls: CatalogueClass | undefined): OptionalFeatureUnlock[] {
+  if (!cls || !Array.isArray(cls.optionalFeatureProgression)) {
+    return []
+  }
+
+  const unlocks: OptionalFeatureUnlock[] = []
+
+  cls.optionalFeatureProgression.forEach((entry) => {
+    const featureTypes = Array.isArray(entry.featureTypes)
+      ? entry.featureTypes
+          .map((type) => (typeof type === 'string' ? type.trim() : ''))
+          .filter((type) => type.length > 0)
+      : []
+    if (featureTypes.length === 0 || !Array.isArray(entry.progression)) {
+      return
+    }
+
+    entry.progression.forEach((step, index) => {
+      if (!step || typeof step !== 'object') {
+        return
+      }
+      const levelValue = (step as { level?: unknown }).level
+      const level = typeof levelValue === 'number' ? levelValue : Number.parseInt(String(levelValue ?? ''), 10)
+      if (!Number.isFinite(level) || level <= 0) {
+        return
+      }
+      const countValue = (step as { count?: unknown }).count
+      const knownValue = (step as { known?: unknown }).known
+      const rawCount =
+        typeof countValue === 'number' && countValue > 0
+          ? countValue
+          : typeof knownValue === 'number' && knownValue > 0
+            ? knownValue
+            : 0
+      const count = Math.max(0, Math.floor(rawCount))
+      if (count <= 0) {
+        return
+      }
+
+      featureTypes.forEach((featureType) => {
+        unlocks.push({
+          decisionKey: `${entry.id}-${index}`,
+          featureType,
+          level,
+          count,
+          label: entry.name,
+          progressionId: entry.id
+        })
+      })
+    })
+  })
+
+  return unlocks
+}
+
+function buildOptionalFeatureInstance(
+  record: OptionalFeatureRecord,
+  cls: CatalogueClass,
+  level: number,
+  label?: string
+): FeatureInstance {
+  const className = cls.name ?? cls.id
+  const baseSource = `${className} Level ${level} Optional Feature${label ? `: ${label}` : ''}`
+  const sources = record.source ? [baseSource, `Source: ${record.source}`] : [baseSource]
+  return {
+    id: record.id,
+    name: record.name,
+    source: sources,
+    description: record.description,
+    mergeStrategy: 'set'
+  }
+}
+
+function validateOptionalFeatureSelection(
+  selection: string[] | undefined,
+  options: OptionalFeatureRecord[],
+  count: number
+): string[] | null {
+  if (!selection) {
+    return null
+  }
+  const filtered = selection.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+  const unique = Array.from(new Set(filtered))
+  if (unique.length !== count) {
+    return null
+  }
+  const optionIds = new Set(options.map((option) => option.id))
+  if (unique.some((choice) => !optionIds.has(choice))) {
+    return null
+  }
+  return unique
 }
 
 function normalizeFeature(feature: unknown): FeatureInstance | null {
@@ -331,10 +439,13 @@ function applyFeatEffects(
   }
 }
 
-export function buildCharacter(state: CharacterBuilderState): BuildResult {
+export function buildCharacter(state: CharacterBuilderState, options: BuildOptions = {}): BuildResult {
   const ancestry: AncestryRecord | undefined = state.ancestryData
   const background: BackgroundRecord | undefined = state.backgroundData
   const cls: CatalogueClass | undefined = state.classData
+
+  const optionalFeaturesByType = options.optionalFeaturesByType ?? {}
+  const optionalFeaturesById = options.optionalFeaturesById ?? {}
 
   const racialBonuses = emptyAbilityRecord()
   if (ancestry) {
@@ -366,6 +477,16 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
   const pendingDecisions: Decision[] = []
   const warnings: string[] = []
   const history: LevelSnapshot[] = []
+  const optionalFeatureWarnings = new Set<string>()
+
+  const optionalFeatureUnlocks = collectOptionalFeatureUnlocks(cls)
+  const optionalUnlocksByLevel = new Map<number, OptionalFeatureUnlock[]>()
+  optionalFeatureUnlocks.forEach((unlock) => {
+    if (!optionalUnlocksByLevel.has(unlock.level)) {
+      optionalUnlocksByLevel.set(unlock.level, [])
+    }
+    optionalUnlocksByLevel.get(unlock.level)!.push(unlock)
+  })
 
   if (ancestry) {
     collectGrantedStrings(ancestry.languages).forEach((language) => {
@@ -526,6 +647,59 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
       snapshot.featuresGained.push(sourced)
     })
 
+    const optionalUnlocks = optionalUnlocksByLevel.get(level) ?? []
+    optionalUnlocks.forEach((unlock) => {
+      const decisionId = `${cls.id}-optional-${unlock.decisionKey}-level-${level}`
+      const optionsForType = optionalFeaturesByType[unlock.featureType] ?? []
+      const pickCount = Math.max(1, unlock.count)
+      const labelSuffix = unlock.label ? ` (${unlock.label})` : ''
+      const decision: Decision = {
+        id: decisionId,
+        type: 'choose-optional-feature',
+        options: optionsForType,
+        min: pickCount,
+        max: pickCount,
+        label: `Choose ${pickCount} optional feature${pickCount === 1 ? '' : 's'}${labelSuffix}`,
+        featureType: unlock.featureType,
+        progressionId: unlock.progressionId,
+        level
+      }
+      snapshot.decisionsRaised.push(decision)
+
+      if (optionsForType.length === 0) {
+        optionalFeatureWarnings.add(
+          `No optional features available for ${cls.name} (${unlock.featureType}) at level ${level}.`
+        )
+      } else if (optionsForType.length < pickCount) {
+        optionalFeatureWarnings.add(
+          `Only ${optionsForType.length} optional feature${optionsForType.length === 1 ? '' : 's'} available for ${cls.name} (${unlock.featureType}) at level ${level}; ${pickCount} required.`
+        )
+      }
+
+      const resolved = state.resolvedDecisions[decisionId] as DecisionValue | undefined
+      if (resolved && resolved.type === 'choose-optional-feature' && resolved.featureType === unlock.featureType) {
+        const valid = validateOptionalFeatureSelection(resolved.choices, optionsForType, pickCount)
+        if (valid) {
+          valid.forEach((choiceId) => {
+            const record = optionalFeaturesById[choiceId] ?? optionsForType.find((option) => option.id === choiceId)
+            if (!record) {
+              optionalFeatureWarnings.add(
+                `Missing data for optional feature "${choiceId}" (${cls.name} level ${level}).`
+              )
+              return
+            }
+            const featureInstance = buildOptionalFeatureInstance(record, cls, level, unlock.label)
+            const cloned = { ...featureInstance, source: [...featureInstance.source] }
+            features.push(cloned)
+            snapshot.featuresGained.push({ ...cloned, source: [...cloned.source] })
+          })
+          return
+        }
+      }
+
+      pendingDecisions.push(decision)
+    })
+
     if (level === 1 && cls.skillChoices) {
       const decisionId = `${cls.id}-level-${level}-skills`
       const decision: Decision = {
@@ -668,6 +842,10 @@ export function buildCharacter(state: CharacterBuilderState): BuildResult {
     features: mergeFeatures(features),
     decisions: pendingDecisions,
     history
+  }
+
+  if (optionalFeatureWarnings.size > 0) {
+    optionalFeatureWarnings.forEach((message) => warnings.push(message))
   }
 
   if (pendingDecisions.length > 0) {
