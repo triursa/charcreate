@@ -14,17 +14,27 @@ const categoryHandlers: Record<string, () => Promise<any[]>> = {
   },
   items: () => prisma.item.findMany(),
   backgrounds: () => prisma.background.findMany(),
-  feats: () => prisma.feat.findMany()
+  feats: () => prisma.feat.findMany(),
+  optionalfeatures: () => prisma.optionalFeature.findMany()
 }
 
 async function buildStats() {
-  const [spellsCount, racesCount, classesCount, itemsCount, backgroundsCount, featsCount] = await prisma.$transaction([
+  const [
+    spellsCount,
+    racesCount,
+    classesCount,
+    itemsCount,
+    backgroundsCount,
+    featsCount,
+    optionalFeaturesCount
+  ] = await prisma.$transaction([
     prisma.spell.count(),
     prisma.race.count(),
     prisma.class.count(),
     prisma.item.count(),
     prisma.background.count(),
-    prisma.feat.count()
+    prisma.feat.count(),
+    prisma.optionalFeature.count()
   ])
 
   return {
@@ -34,7 +44,8 @@ async function buildStats() {
     subclasses: 0,
     items: itemsCount,
     backgrounds: backgroundsCount,
-    feats: featsCount
+    feats: featsCount,
+    optionalfeatures: optionalFeaturesCount
   }
 }
 

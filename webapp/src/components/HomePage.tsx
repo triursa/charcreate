@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Zap, Users, Shield, Scroll, Book, Map, Award, BarChart3, TrendingUp } from 'lucide-react'
+import { Zap, Users, Shield, Scroll, Book, Map, Award, Sparkles, BarChart3, TrendingUp } from 'lucide-react'
 import { ContentStats } from '@/lib/clientDataLoader'
 import { SpellsPage } from '@/components/pages/SpellsPage'
 import { RacesPage } from '@/components/pages/RacesPage'
@@ -67,6 +67,14 @@ const categoryCards = [
     icon: Award,
     color: 'from-pink-500 to-red-600',
     textColor: 'text-pink-600 dark:text-pink-400'
+  },
+  {
+    id: 'optionalfeatures',
+    title: 'Optional Features',
+    description: 'Browse variant class features and additional options',
+    icon: Sparkles,
+    color: 'from-purple-500 to-indigo-600',
+    textColor: 'text-purple-600 dark:text-purple-400'
   }
 ]
 

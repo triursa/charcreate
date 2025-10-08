@@ -8,6 +8,7 @@ export interface ContentStats {
   items: number
   backgrounds: number
   feats: number
+  optionalfeatures: number
 }
 
 export interface AllContent {
@@ -17,6 +18,7 @@ export interface AllContent {
   items: any[]
   backgrounds: any[]
   feats: any[]
+  optionalfeatures: any[]
   [key: string]: any[]
 }
 
@@ -27,6 +29,7 @@ export type ContentCategory =
   | 'items'
   | 'backgrounds'
   | 'feats'
+  | 'optionalfeatures'
 
 export const CONTENT_CATEGORIES: ContentCategory[] = [
   'spells',
@@ -34,7 +37,8 @@ export const CONTENT_CATEGORIES: ContentCategory[] = [
   'classes',
   'items',
   'backgrounds',
-  'feats'
+  'feats',
+  'optionalfeatures'
 ]
 
 interface CategoryResponse {
@@ -197,7 +201,8 @@ export async function getContentStats(): Promise<ContentStats> {
         subclasses: 0,
         items: 0,
         backgrounds: 0,
-        feats: 0
+        feats: 0,
+        optionalfeatures: 0
       }
       return statsCache
     } finally {
