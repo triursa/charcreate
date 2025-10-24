@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-surface-100 text-slate-100 min-h-screen;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+a {
+  @apply text-sky-300 hover:text-sky-200 transition;
+}
+
+input, select, button, textarea {
+  @apply bg-surface-200 text-slate-100 border border-surface-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2 focus:ring-offset-surface-100;
+}
+
+button {
+  @apply px-4 py-2 font-medium rounded-md;
+}
+
+button.primary {
+  @apply bg-sky-500 hover:bg-sky-400 text-slate-900;
+}
+
+button.secondary {
+  @apply bg-surface-300 hover:bg-surface-400;
+}
+
+.card {
+  @apply bg-surface-200/80 border border-surface-400/40 rounded-xl shadow-lg backdrop-blur;
+}
+
+.step-title {
+  @apply text-lg font-semibold tracking-wide text-slate-200;
+}
