@@ -138,6 +138,7 @@ interface FeatureResolution {
   audit: AuditEntry[];
   skillChoices: string[];
   fightingStyles: FightingStyle[];
+  notes: string[];
 }
 
 function resolveFeatures(
@@ -148,6 +149,7 @@ function resolveFeatures(
   const fightingStyles: FightingStyle[] = [];
   const extraFeatures: Feature[] = [];
   const audit: AuditEntry[] = [];
+  const notes: string[] = [];
 
   allFeatures.forEach((feature) => {
     feature.effects.forEach((effect) => {
@@ -197,7 +199,7 @@ function resolveFeatures(
     });
   });
 
-  return { features: allFeatures, extraFeatures, audit, skillChoices, fightingStyles };
+  return { features: allFeatures, extraFeatures, audit, skillChoices, fightingStyles, notes };
 }
 
 export function computeCharacter(state: CharacterState): {
@@ -268,7 +270,7 @@ export function computeCharacter(state: CharacterState): {
     race.languages.forEach((lang) => languages.add(lang));
   }
 
-  const notes = new Set<string>();
+  const notes = new Set<string>(resolved.notes);
 
   const audit: Record<string, AuditEntry[]> = {};
 
