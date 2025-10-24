@@ -1,3 +1,0 @@
--- AlterTable
-ALTER TABLE "Feat" ADD COLUMN "_copy" JSONB;
-ALTER TABLE "Feat" ADD COLUMN "page" INTEGER;

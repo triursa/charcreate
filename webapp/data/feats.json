@@ -1,9 +1,0 @@
-{
-  "feat": [
-    {
-      "name": "Alert",
-      "entries": ["You gain a +5 bonus to initiative and can't be surprised while conscious."],
-      "prerequisite": null
-    }
-  ]
-}
