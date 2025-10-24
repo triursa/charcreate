@@ -8,3 +8,9 @@ Each character should have an audit trail that allows people to understand the i
 
 ## MVP
 In the past, we're trying to do too much all at once. I'd like to have two working Backgrounds, two working races, and the fighter class built out with dice roller mechanics to build out a character.
+
+## Content
+Content for the MVP should be transposed and used from the content provided in the repository. 
+
+## UI/UX
+This should be a sleek webapp with dark mode ONLY (no switchers). 
